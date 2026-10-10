@@ -10,6 +10,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -19,7 +23,7 @@ body {
 }
 
 main {
-  max-width: 34rem;
+  max-width: 40rem;
   padding: 4.5rem 1.5rem 3rem;
 }
 
@@ -40,18 +44,156 @@ h1 {
   line-height: 0.95;
 }
 
+h2 {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
 .tagline {
   margin: 0.9rem 0 0;
   font-size: 1.35rem;
   line-height: 1.35;
 }
 
-#status {
-  margin: 2.75rem 0 0;
-  padding-top: 1rem;
-  border-top: 1px solid var(--rule);
-  color: var(--muted);
+#status,
+#model-note,
+.meta,
+.field,
+button,
+select,
+textarea,
+legend {
   font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+#status,
+#model-note {
+  margin: 2rem 0 0;
+  color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+#status {
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+#model-note {
+  margin-top: 0.75rem;
+}
+
+form,
+section {
+  margin-top: 2rem;
+}
+
+fieldset {
+  margin: 0 0 1.25rem;
+  padding: 0;
+  border: 0;
+}
+
+legend,
+.field {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+fieldset label {
+  margin-right: 1rem;
+}
+
+select,
+textarea {
+  display: block;
+  width: 100%;
+  margin-bottom: 1.25rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+#proposal p,
+#active p {
+  font-size: 1.15rem;
+  line-height: 1.45;
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9.5rem) repeat(13, 1fr);
+  gap: 3px;
+  align-items: center;
+}
+
+.row-label {
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.cell {
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+}
+
+.cell.lit {
+  background: var(--rule);
+}
+
+#sessions {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#sessions li {
+  margin: 0;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+#sessions p {
+  margin: 0.35rem 0 0;
+}
+
+.empty {
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
 }

@@ -12,8 +12,9 @@ from outmark.clock import Clock, SystemClock
 from outmark.config import Settings, load_settings, model_is_present
 from outmark.display import MatrixDisplay, publish
 from outmark.engine import SessionEngine
-from outmark.generator import source_from_settings
+from outmark.generator import ActivitySource, source_from_settings
 from outmark.storage import STORE_FILENAME, JsonStore
+from outmark.web import register
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ def create_app(
     *,
     display: MatrixDisplay | None = None,
     clock: Clock | None = None,
+    source: ActivitySource | None = None,
 ) -> Flask:
     """Build the local web application and prepare the data directory."""
     resolved = settings if settings is not None else load_settings()
@@ -35,14 +37,16 @@ def create_app(
         static_folder=str(PACKAGE_ROOT / "static"),
     )
     app.config["OUTMARK_SETTINGS"] = resolved
-    app.config["OUTMARK_ENGINE"] = None
-    app.config["OUTMARK_ACTIVITY_SOURCE"] = source_from_settings(
+    app.config["OUTMARK_DISPLAY"] = display
+    app.config["OUTMARK_ENGINE"] = _open_engine(resolved, clock or SystemClock())
+    app.config["OUTMARK_ACTIVITY_SOURCE"] = source or source_from_settings(
         resolved.llm_url,
         resolved.llm_model,
         resolved.llm_timeout_seconds,
     )
-    if display is not None:
-        _publish_startup(app, resolved, display, clock or SystemClock())
+    register(app)
+    if display is not None and app.config["OUTMARK_ENGINE"] is not None:
+        _publish_startup(app)
 
     @app.get("/health")
     def health():
@@ -69,11 +73,18 @@ def _data_dir_ready(path: Path) -> bool:
     return path.is_dir() and os.access(path, os.W_OK)
 
 
-def _publish_startup(app: Flask, settings: Settings, display: MatrixDisplay, clock: Clock) -> None:
+def _open_engine(settings: Settings, clock: Clock) -> SessionEngine | None:
+    """Load stored sessions. A bad file leaves the engine unset and the file untouched."""
+    try:
+        return SessionEngine(JsonStore(settings.data_dir / STORE_FILENAME), clock)
+    except Exception:
+        logger.exception("Stored sessions were left unchanged.")
+        return None
+
+
+def _publish_startup(app: Flask) -> None:
     """Push the stored grid once. A bridge failure leaves the JSON file alone."""
     try:
-        engine = SessionEngine(JsonStore(settings.data_dir / STORE_FILENAME), clock)
-        app.config["OUTMARK_ENGINE"] = engine
-        publish(engine, display)
+        publish(app.config["OUTMARK_ENGINE"], app.config["OUTMARK_DISPLAY"])
     except Exception:
         logger.exception("Matrix startup skipped. Stored sessions were left unchanged.")

@@ -72,7 +72,7 @@ sketch/sketch.yaml        RouterBridge libraries for the sketch
 tests/                    Automated checks that do not need the board
 ```
 
-Open the repository as an Arduino App Lab app when the board is available. The session engine in `python/outmark/engine.py` stores proposals and sessions in `data/outmark.json`. On the board, `main.py` sends that state to the matrix through the Arduino Bridge. On a computer without `arduino.app_utils`, the web service still starts and the matrix is left unchanged. The webpage does not accept or report commitments yet. See `docs/BUILD_PLAN.md`.
+Open the repository as an Arduino App Lab app when the board is available. The session engine in `python/outmark/engine.py` stores proposals and sessions in `data/outmark.json`. On the board, `main.py` sends that state to the matrix through the Arduino Bridge. On a computer without `arduino.app_utils`, the web service still starts and the matrix is left unchanged. The page at `/` asks for one activity, accepts or rejects it, runs the timer, and records an explicit kept or not-kept report. See `docs/BUILD_PLAN.md`.
 
 ## Local model
 

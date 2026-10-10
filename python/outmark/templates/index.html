@@ -7,11 +7,64 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
-    <main>
+    <main id="app">
       <p class="mark">8 × 13</p>
       <h1>Outmark</h1>
       <p class="tagline">Make a promise. Step away. Leave a mark.</p>
       <p id="status" role="status">Checking the local service…</p>
+      <p id="model-note" hidden></p>
+
+      <form id="setup">
+        <fieldset>
+          <legend>Minutes</legend>
+          <label><input type="radio" name="duration" value="5"> 5</label>
+          <label><input type="radio" name="duration" value="10" checked> 10</label>
+          <label><input type="radio" name="duration" value="15"> 15</label>
+        </fieldset>
+        <label class="field" for="category">Category</label>
+        <select id="category" name="category">
+          <option value="walking">Walking and movement</option>
+          <option value="nature_observation">Nature observation</option>
+          <option value="quiet_outdoor">Quiet outdoor time</option>
+          <option value="social">Social connection</option>
+          <option value="outdoor_care">Outdoor care or helping</option>
+          <option value="exploring">Exploring a new place</option>
+          <option value="creative_observation">Creative observation</option>
+          <option value="other">Other offline experiences</option>
+        </select>
+        <button type="submit">Suggest an activity</button>
+      </form>
+
+      <section id="proposal" hidden>
+        <h2 id="proposal-title"></h2>
+        <p id="proposal-instructions"></p>
+        <p id="proposal-meta" class="meta"></p>
+        <p id="proposal-question"></p>
+        <div class="actions">
+          <button type="button" id="accept" class="primary">Accept and start</button>
+          <button type="button" id="reject">Another suggestion</button>
+        </div>
+      </section>
+
+      <section id="active" hidden>
+        <h2 id="active-title"></h2>
+        <p id="active-quest"></p>
+        <p id="timer" class="timer"></p>
+        <p id="active-question"></p>
+        <label class="field" for="reflection">Reflection, if you want one</label>
+        <textarea id="reflection" maxlength="280" rows="3"></textarea>
+        <div class="actions">
+          <button type="button" id="kept" class="primary">I kept it</button>
+          <button type="button" id="not-kept">I did not keep it</button>
+        </div>
+      </section>
+
+      <section id="history">
+        <h2>History</h2>
+        <p id="history-range" class="meta"></p>
+        <div id="grid" class="grid"></div>
+        <ul id="sessions"></ul>
+      </section>
     </main>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>

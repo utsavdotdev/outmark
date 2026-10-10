@@ -373,6 +373,20 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - Loading, error, and model-unavailable states are visible.
 - The page and the display both follow the stored session, including after a reload.
 
+**Status:** complete in this commit for the software contract. The physical matrix was not updated from the page.
+
+**Checks performed:**
+
+- `ruff check python tests` passed.
+- `ruff format --check python tests` passed.
+- `pytest`: 48 passed on Python 3.14.5. The webpage tests use a scripted activity source and an in-memory display. They check one proposal at a time, another suggestion after reject, timer progress, a deadline that stays `active`, a kept report that lights one cell and stores a reflection, a not-kept report that does not light a cell, invalid input that does not write a file, a failed matrix call that keeps the accepted session, and a corrupt store that is not rewritten.
+- In a browser on this computer, against `http://127.0.0.1:8765` with no model file and no bridge: the page showed the missing-model note, the loading line, one catalog suggestion, reject, a second suggestion, a running timer, a kept report with its reflection, the same history after reload, a not-kept report that left the earlier cell lit, and the duration error for a value outside 5, 10, and 15.
+
+**Not run on hardware:**
+
+- No LED changed. The browser session had no Arduino Bridge.
+- The page was not driven through a live `llama-server` response. The browser path used the catalog after the local model request failed.
+
 ### Stage 6 — Reliability and offline validation
 
 **Commit:** `test: harden Outmark and verify offline behavior`
