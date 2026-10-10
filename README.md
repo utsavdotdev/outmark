@@ -68,7 +68,7 @@ sketch/                   Added when the matrix is integrated
 tests/                    Automated checks that do not need the board
 ```
 
-Open the repository as an Arduino App Lab app when the board is available. The sketch is not part of this scaffold. Matrix rendering, the session timer, and local inference come in later stages. See `docs/BUILD_PLAN.md`.
+Open the repository as an Arduino App Lab app when the board is available. The session engine in `python/outmark/engine.py` stores proposals and sessions in `data/outmark.json`. The webpage does not accept or report commitments yet. Matrix rendering and local inference come in later stages. See `docs/BUILD_PLAN.md`.
 
 ## Checks
 

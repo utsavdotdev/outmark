@@ -288,6 +288,22 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - Tests cover accept, reject, duplicates, expiry, incomplete sessions, persistence, and recovery.
 - No matrix and no model calls in this stage.
 
+**Status:** complete in this commit.
+
+**Checks performed:**
+
+- `ruff check python tests` passed.
+- `ruff format --check python tests` passed.
+- `pytest`: 18 passed on Python 3.14.5. The new tests cover accept, reject, duplicate transitions, monotonic elapsed time, wall-clock recovery, expiry without a `kept` write, a `not_kept` report that leaves older cells lit, and a corrupt file that is left untouched.
+- The webpage was not changed, so there was no new browser flow to exercise.
+
+**Known limitations:**
+
+- The Flask page still does not accept, reject, or report. Those routes belong to stage 5.
+- No matrix update is sent. No model is called. A proposal is created from an already validated activity draft.
+- Display elapsed time is clamped to the session duration. The stored status stays `active` until an explicit report.
+- Not run on the UNO Q.
+
 ### Stage 3 — UNO Q matrix integration
 
 **Commit:** `feat: integrate UNO Q LED matrix`
