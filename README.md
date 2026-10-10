@@ -11,35 +11,30 @@ This repository currently runs the Linux-side web service. It starts without a l
 
 ## Run the health check
 
-From the repository root:
+From the repository root, the checks run on the development machine were:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r python/requirements-dev.txt
-pytest
-python python/main.py
+python -m pytest
+python -m ruff check python tests
+python -m ruff format --check python tests
 ```
 
-Then open `http://127.0.0.1:8080/` or request the health endpoint:
+`app.yaml` publishes port 8080. On this machine that port was already taken, so the service was started with:
 
 ```bash
-curl -s http://127.0.0.1:8080/health
+OUTMARK_HOST=127.0.0.1 OUTMARK_PORT=8765 python python/main.py
 ```
 
-A healthy process with no model installed responds with:
+Opening `http://127.0.0.1:8765/` loaded the page. `GET /health` with no model installed responded with:
 
 ```json
 {"data_dir_ready": true, "model_present": false, "status": "ok"}
 ```
 
-If port 8080 is already in use, pick a free port. On macOS, 5000 and 7000 are often taken by AirPlay.
-
-```bash
-OUTMARK_PORT=8765 python python/main.py
-```
-
-Stop the server with Ctrl-C.
+Stop the server with Ctrl-C. Ports 5000 and 7000 are often taken by AirPlay on macOS.
 
 `python/requirements.txt` is the set App Lab installs on the board. `python/requirements-dev.txt` adds pytest and ruff for this computer.
 
@@ -76,7 +71,7 @@ Open the repository as an Arduino App Lab app when the board is available. The s
 
 ## Local model
 
-Activity text comes from a local `llama-server` (llama.cpp) speaking `POST /v1/chat/completions`. The first model to try is [Qwen2.5-0.5B-Instruct Q4_K_M](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF), about 491 MB, Apache 2.0. Download it on the board into `models/` (that directory is gitignored):
+Activity text comes from a local `llama-server` (llama.cpp) speaking `POST /v1/chat/completions`. The first model to try is [Qwen2.5-0.5B-Instruct Q4_K_M](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF), about 491 MB, Apache 2.0. The download and `llama-server` commands below have not been run in this repository. Download the file on the board into `models/` (that directory is gitignored):
 
 ```bash
 curl -L -o models/qwen2.5-0.5b-instruct-q4_k_m.gguf \

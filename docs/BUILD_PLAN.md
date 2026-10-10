@@ -402,6 +402,30 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - The write-up separates automated tests, simulated hardware tests, and tests actually run on the board.
 - Setup notes match the commands that were actually used.
 
+**Status:** complete for automated tests and the in-memory display. Nothing in this stage was run on a UNO Q.
+
+**Automated tests** (no board, no model file, no live `llama-server`):
+
+- `ruff check python tests` passed.
+- `ruff format --check python tests` passed.
+- `pytest`: 54 passed on Python 3.14.5.
+- A closed local port and a non-JSON model reply both return a catalog activity through `POST /api/quest`. A public model URL is not contacted.
+- Rejecting that proposal writes no session and does not start a timer.
+- A new process, opened after the deadline, restores the session as `active` and does not mark it kept. Reading the session does not change the JSON file.
+- Fourteen days later the 13-day history is empty, and the kept session is still in the file.
+- Health and quest generation were exercised with no `.gguf` present.
+
+**Simulated hardware** (an in-memory stand-in records `set_mode`, `set_progress`, and `set_grid_row`; no LED is lit):
+
+- After reject, the stand-in stays on the idle mark.
+- After a restart past the deadline, the stand-in is on the done mark while the stored status stays `active`.
+- After the 13-day window rolls past a kept day, the stand-in returns to the idle mark.
+- A display that raises during a kept report leaves the JSON file intact. A later startup publish of that file selects the history grid.
+
+**Run on the board:** none. The sketch was not compiled. No matrix cell was observed. `llama-server` was not started, and the model file was not downloaded. External internet was not unplugged; the offline check is the closed local port and the refused public URL above.
+
+**Setup notes:** the README run steps match the commands used on this machine. The verified server start was `OUTMARK_HOST=127.0.0.1 OUTMARK_PORT=8765 python python/main.py`, because port 8080 was already taken. The model download and `llama-server` commands are labeled as not run.
+
 ### Stage 7 — Documentation and demo readiness
 
 **Commit:** `docs: finalize Outmark setup and demo guide`
