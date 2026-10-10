@@ -15,3 +15,7 @@ class TransitionError(Exception):
 
 class DisplayError(Exception):
     """A matrix command was rejected before it was sent."""
+
+
+class LocalModelError(Exception):
+    """The local model could not be used. Callers fall back instead of leaving the device."""

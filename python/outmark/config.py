@@ -19,6 +19,9 @@ class Settings:
     data_dir: Path
     model_dir: Path
     log_level: str
+    llm_url: str = "http://127.0.0.1:8081/v1/chat/completions"
+    llm_model: str = "qwen2.5-0.5b-instruct"
+    llm_timeout_seconds: float = 60.0
 
 
 def load_settings() -> Settings:
@@ -31,6 +34,9 @@ def load_settings() -> Settings:
         data_dir=data_dir,
         model_dir=model_dir,
         log_level=_log_level(os.environ.get("OUTMARK_LOG_LEVEL", "INFO")),
+        llm_url=os.environ.get("OUTMARK_LLM_URL", "http://127.0.0.1:8081/v1/chat/completions"),
+        llm_model=_model_name(os.environ.get("OUTMARK_LLM_MODEL", "qwen2.5-0.5b-instruct")),
+        llm_timeout_seconds=_timeout(os.environ.get("OUTMARK_LLM_TIMEOUT", "60")),
     )
 
 
@@ -56,6 +62,23 @@ def _port(raw: str) -> int:
     if not 1 <= port <= 65535:
         raise ValueError("OUTMARK_PORT must be between 1 and 65535")
     return port
+
+
+def _timeout(raw: str) -> float:
+    try:
+        timeout = float(raw)
+    except ValueError as exc:
+        raise ValueError("OUTMARK_LLM_TIMEOUT must be a number of seconds") from exc
+    if not 1 <= timeout <= 600:
+        raise ValueError("OUTMARK_LLM_TIMEOUT must be between 1 and 600 seconds")
+    return timeout
+
+
+def _model_name(raw: str) -> str:
+    name = raw.strip()
+    if not name or len(name) > 80 or any(char.isspace() for char in name):
+        raise ValueError("OUTMARK_LLM_MODEL must be a short model alias without spaces")
+    return name
 
 
 def _log_level(raw: str) -> str:

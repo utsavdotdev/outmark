@@ -346,6 +346,21 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - Latency and memory are measured on the board when the board is available. If it is not, the commit says that measurement was not done.
 - No fine-tuning, vector database, agents, or extra models.
 
+**Status:** complete in this commit for the software contract. Latency and memory were not measured on the UNO Q.
+
+**Checks performed:**
+
+- `ruff check python tests` passed.
+- `ruff format --check python tests` passed.
+- `pytest`: 37 passed on Python 3.14.5. The ten new generator tests use a scripted chat client and one local loopback HTTP server. They check that the requested duration wins over model JSON, fenced JSON is accepted, malformed output, a bad category, empty instructions, and a completion claim fall back to the catalog, a transport error avoids a recent title, a public model URL is not called, an invalid duration is rejected before any call, a stored reflection is included in the next prompt and is not rewritten by generation, the request carries no API key, and startup does not contact the model.
+- No new webpage route was added.
+
+**Not run on hardware:**
+
+- `llama-server` was not started. No GGUF was downloaded. Generation latency and memory use were not measured.
+- Whether an App Lab container can reach a host model on `127.0.0.1:8081` or only through `HOST_IP` was not checked.
+- The fallback catalog was not compared with a live Qwen2.5-0.5B-Instruct response.
+
 ### Stage 5 — Complete user experience
 
 **Commit:** `feat: integrate complete Outmark workflow`

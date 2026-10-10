@@ -12,6 +12,7 @@ from outmark.clock import Clock, SystemClock
 from outmark.config import Settings, load_settings, model_is_present
 from outmark.display import MatrixDisplay, publish
 from outmark.engine import SessionEngine
+from outmark.generator import source_from_settings
 from outmark.storage import STORE_FILENAME, JsonStore
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -35,6 +36,11 @@ def create_app(
     )
     app.config["OUTMARK_SETTINGS"] = resolved
     app.config["OUTMARK_ENGINE"] = None
+    app.config["OUTMARK_ACTIVITY_SOURCE"] = source_from_settings(
+        resolved.llm_url,
+        resolved.llm_model,
+        resolved.llm_timeout_seconds,
+    )
     if display is not None:
         _publish_startup(app, resolved, display, clock or SystemClock())
 
