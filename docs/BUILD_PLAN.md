@@ -438,6 +438,19 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - A short demo script matches the definition of done below.
 - A new developer can follow the steps that were verified. Unverified board steps stay marked as unverified.
 
+**Status:** complete in this commit. The README is the setup and demo guide. No board was used while writing it.
+
+**What the README now covers:**
+
+- How to run the service on a computer, using the command that worked here: `OUTMARK_HOST=127.0.0.1 OUTMARK_PORT=8765 python python/main.py`.
+- Hardware setup for App Lab, the sketch libraries, the bridge, and the power button. Each of those steps is marked as not run on a board.
+- The Qwen2.5-0.5B-Instruct Q4_K_M download and `llama-server` launch, marked as not run. The model is Apache 2.0. This repository has no application `LICENSE` file. SmolLM2-360M-Instruct is named as the fallback and was not downloaded.
+- The Linux / model / STM32 split, and the session state machine.
+- Privacy, self-reported kept cells, and the open board limits.
+- A ten-step demo that matches the definition of done, with a column for what was checked on this computer and what was not.
+
+**Not run on hardware:** unchanged. No sketch compile, no LED, no model download, no phone opening the App Lab port, no internet disconnect.
+
 ## Test strategy
 
 Three layers, reported separately:
