@@ -11,3 +11,7 @@ class ValidationError(Exception):
 
 class TransitionError(Exception):
     """The requested change is not allowed from the current state."""
+
+
+class DisplayError(Exception):
+    """A matrix command was rejected before it was sent."""

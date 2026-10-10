@@ -11,14 +11,19 @@ if str(_PYTHON_ROOT) not in sys.path:
 
 from outmark.app import create_app  # noqa: E402
 from outmark.config import load_settings  # noqa: E402
+from outmark.display import open_bridge_display, start_refresh  # noqa: E402
 from outmark.logsetup import configure_logging  # noqa: E402
 
 
 def main() -> None:
-    """Start the local web server. A missing model does not stop startup."""
+    """Start the local web server. A missing model or bridge does not stop startup."""
     settings = load_settings()
     configure_logging(settings.log_level)
-    app = create_app(settings)
+    display = open_bridge_display()
+    app = create_app(settings, display=display)
+    engine = app.config["OUTMARK_ENGINE"]
+    if display is not None and engine is not None:
+        start_refresh(engine, display)
     app.run(host=settings.host, port=settings.port, debug=False)
 
 

@@ -315,6 +315,23 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - Application tests use a fake display and do not need the board.
 - Any check that was not run on hardware is listed here as not run. A passing unit test is not a passing matrix test.
 
+**Status:** complete in this commit for the software contract. The physical matrix was not tested.
+
+**Checks performed:**
+
+- `ruff check python tests` passed.
+- `ruff format --check python tests` passed.
+- `pytest`: 27 passed on Python 3.14.5. Display tests use an in-memory stand-in. They check mode selection, the 13-bit masks, the 104-pixel frame rules, rejection of an out-of-range mask, and that a failed display call leaves the JSON file unchanged.
+- The webpage was not given new controls, so there was no new browser flow.
+
+**Not run on hardware:**
+
+- The sketch was not compiled or flashed.
+- No LED was observed. Row 0, column 0, and the pending, active, done, and idle patterns are unverified on the glass.
+- `Bridge.call` integer arguments were not confirmed against the board's MessagePack types.
+- `sketch/sketch.yaml` copies RouterBridge 0.3.0 and its dependencies from Arduino's led-matrix-painter example. Those versions were not resolved on this machine.
+- RGB LEDs are unused.
+
 ### Stage 4 — Local open-weight AI
 
 **Commit:** `feat: add local AI activity generation`

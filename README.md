@@ -64,11 +64,14 @@ app.yaml                  App Lab manifest
 python/main.py            Linux entry point
 python/outmark/           Importable application package
 python/requirements.txt   Board dependencies
-sketch/                   Added when the matrix is integrated
+sketch/sketch.ino          LED matrix modes, drawn on the STM32
+sketch/sketch.yaml        RouterBridge libraries for the sketch
 tests/                    Automated checks that do not need the board
 ```
 
-Open the repository as an Arduino App Lab app when the board is available. The session engine in `python/outmark/engine.py` stores proposals and sessions in `data/outmark.json`. The webpage does not accept or report commitments yet. Matrix rendering and local inference come in later stages. See `docs/BUILD_PLAN.md`.
+Open the repository as an Arduino App Lab app when the board is available. The session engine in `python/outmark/engine.py` stores proposals and sessions in `data/outmark.json`. On the board, `main.py` sends that state to the matrix through the Arduino Bridge. On a computer without `arduino.app_utils`, the web service still starts and the matrix is left unchanged. The webpage does not accept or report commitments yet. Local inference comes in a later stage. See `docs/BUILD_PLAN.md`.
+
+The sketch was not compiled in this repository's tests. Pytest checks the display commands and the 104-pixel frame rules. It does not light a physical LED.
 
 ## Checks
 
