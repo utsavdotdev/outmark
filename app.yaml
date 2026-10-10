@@ -1,0 +1,6 @@
+name: Outmark
+description: Local self-accountability companion for screen-free outdoor commitments.
+icon: "🌿"
+ports:
+  - 8080
+bricks: []

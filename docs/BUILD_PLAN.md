@@ -256,6 +256,23 @@ Each stage gets one commit after its checks pass. Do not combine stages. Do not 
 - Automated tests cover import and the health route.
 - `data/`, `models/`, virtual environments, and secrets are gitignored.
 
+**Status:** complete in this commit.
+
+**Checks performed:**
+
+- `ruff check python tests` passed.
+- `ruff format --check python tests` passed.
+- `pytest`: 5 passed on Python 3.14.5. The health check passes when `models/` does not exist.
+- Browser: loaded the home page on this machine. The status line reported that the local service is running and that activity generation waits until a model file is installed. `GET /health` returned `data_dir_ready: true`, `model_present: false`, and `status: ok`.
+- Port 8080 on this development machine was already taken by another local web server, so the browser check used `OUTMARK_PORT=7000`. The App Lab manifest still publishes 8080.
+
+**Known limitations:**
+
+- `sketch/` is not in this commit. The matrix sketch belongs to stage 3.
+- The app was not opened in App Lab and was not run on the UNO Q.
+- The process uses Flask's built-in server.
+- No model weights were installed. Startup succeeded without them.
+
 ### Stage 2 — Commitment and session engine
 
 **Commit:** `feat: implement commitment and session lifecycle`

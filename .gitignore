@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# App Lab persistent data and downloaded weights.
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+*.gguf
+
+# App Lab runtime cache (virtualenv, compose files).
+.cache/
