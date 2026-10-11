@@ -102,9 +102,10 @@ def test_invalid_duration_does_not_call_the_model() -> None:
 
 
 def test_generation_does_not_change_stored_sessions(tmp_path: Path) -> None:
-    engine, path = _engine(tmp_path)
+    engine, path, clock = _engine(tmp_path)
     proposal = engine.propose(_draft())
     session = engine.accept(proposal.id)
+    clock.advance(session.duration_minutes * 60)
     engine.report(session.id, CompletionReport("kept", "A sparrow on the wall."))
     before = path.read_text(encoding="utf-8")
     request = request_from_engine(engine, 10, "nature_observation")
@@ -117,8 +118,9 @@ def test_generation_does_not_change_stored_sessions(tmp_path: Path) -> None:
 
 
 def test_recent_reflection_is_included_in_the_prompt(tmp_path: Path) -> None:
-    engine, _path = _engine(tmp_path)
+    engine, _path, clock = _engine(tmp_path)
     session = engine.accept(engine.propose(_draft()).id)
+    clock.advance(session.duration_minutes * 60)
     engine.report(session.id, CompletionReport("kept", "The leaves were wet."))
     client = _Scripted(_activity_json())
 
@@ -208,10 +210,11 @@ class _ChatHandler(BaseHTTPRequestHandler):
         return
 
 
-def _engine(tmp_path: Path) -> tuple[SessionEngine, Path]:
+def _engine(tmp_path: Path) -> tuple[SessionEngine, Path, FakeClock]:
     path = tmp_path / "outmark.json"
-    engine = SessionEngine(JsonStore(path), FakeClock(START))
-    return engine, path
+    clock = FakeClock(START)
+    engine = SessionEngine(JsonStore(path), clock)
+    return engine, path, clock
 
 
 def _settings(tmp_path: Path) -> Settings:

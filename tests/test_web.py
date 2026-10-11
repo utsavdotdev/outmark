@@ -133,10 +133,39 @@ def test_deadline_asks_for_a_report_and_does_not_mark_kept(tmp_path: Path) -> No
     assert _mode(display) == MODE_DONE
 
 
+def test_an_early_report_is_rejected_with_the_remaining_time(tmp_path: Path) -> None:
+    clock = FakeClock(START)
+    client = _client(tmp_path, RecordingDisplay(), _Source([_draft()]), clock)
+    proposed = client.post("/api/quest", json={"duration_minutes": 5, "category": "walking"})
+    proposal_id = proposed.get_json()["proposal"]["id"]
+    started = client.post("/api/session/start", json={"proposal_id": proposal_id})
+    session_id = started.get_json()["session"]["id"]
+    clock.advance(120)
+
+    early = client.post(
+        "/api/session/report",
+        json={"session_id": session_id, "outcome": "kept", "reflection": None},
+    )
+
+    assert early.status_code == 409
+    assert early.get_json()["remaining_seconds"] == 180
+    assert client.get("/api/session").get_json()["phase"] == "active"
+    clock.advance(180)
+    ready = client.get("/api/session").get_json()
+    assert ready["phase"] == "awaiting_report"
+    reported = client.post(
+        "/api/session/report",
+        json={"session_id": session_id, "outcome": "kept", "reflection": None},
+    )
+    assert reported.status_code == 200
+
+
 def test_kept_report_lights_a_cell_and_shows_the_reflection(tmp_path: Path) -> None:
     display = RecordingDisplay()
-    client = _client(tmp_path, display, _Source([_draft()]))
+    clock = FakeClock(START)
+    client = _client(tmp_path, display, _Source([_draft()]), clock)
     session_id = _start(client)
+    clock.advance(600)
 
     reported = client.post(
         "/api/session/report",
@@ -155,8 +184,10 @@ def test_kept_report_lights_a_cell_and_shows_the_reflection(tmp_path: Path) -> N
 
 def test_not_kept_is_listed_and_does_not_light_a_cell(tmp_path: Path) -> None:
     display = RecordingDisplay()
-    client = _client(tmp_path, display, _Source([_draft()]))
+    clock = FakeClock(START)
+    client = _client(tmp_path, display, _Source([_draft()]), clock)
     session_id = _start(client)
+    clock.advance(600)
 
     reported = client.post(
         "/api/session/report",

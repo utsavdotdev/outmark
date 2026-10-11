@@ -117,6 +117,14 @@ class SessionEngine:
         session = self._session(session_id)
         if session.status is not SessionStatus.ACTIVE:
             raise TransitionError("only an active session can be reported")
+        duration = session.duration_minutes * 60
+        raw_elapsed = self._clock.monotonic() - self._anchors[session.id]
+        if raw_elapsed < duration:
+            remaining = duration - max(0.0, raw_elapsed)
+            raise TransitionError(
+                "the commitment can be reported after the timer ends",
+                remaining_seconds=remaining,
+            )
         outcome = require_outcome(report.outcome)
         reflection = optional_text(report.reflection, "reflection", REFLECTION_LIMIT)
         reported = Session(

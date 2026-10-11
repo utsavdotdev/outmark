@@ -47,7 +47,7 @@ def test_idle_engine_selects_rest_and_does_not_create_a_file(tmp_path: Path) -> 
 
 def test_grid_puts_the_oldest_day_in_column_zero(tmp_path: Path) -> None:
     engine, clock, _path = _engine(tmp_path, START - timedelta(days=12))
-    _close(engine, "walking", "kept")
+    _close(engine, clock, "walking", "kept")
     clock.set_wall(START)
     display = RecordingDisplay()
 
@@ -63,7 +63,7 @@ def test_grid_puts_the_oldest_day_in_column_zero(tmp_path: Path) -> None:
 
 def test_pending_active_and_done_are_distinct_from_a_kept_cell(tmp_path: Path) -> None:
     engine, clock, path = _engine(tmp_path)
-    _close(engine, "nature_observation", "kept")
+    _close(engine, clock, "nature_observation", "kept")
     proposal = engine.propose(_draft(duration_minutes=10))
     engine.accept(proposal.id)
     before = path.read_text(encoding="utf-8")
@@ -96,9 +96,9 @@ def test_pending_active_and_done_are_distinct_from_a_kept_cell(tmp_path: Path) -
 
 def test_not_kept_leaves_the_older_cell_on_the_grid(tmp_path: Path) -> None:
     engine, clock, _path = _engine(tmp_path, START - timedelta(days=1))
-    _close(engine, "walking", "kept")
+    _close(engine, clock, "walking", "kept")
     clock.set_wall(START)
-    _close(engine, "walking", "not_kept")
+    _close(engine, clock, "walking", "not_kept")
     display = RecordingDisplay()
 
     publish(engine, display)
@@ -118,8 +118,8 @@ def test_invalid_mask_is_rejected_before_any_call() -> None:
 
 
 def test_a_failed_display_call_does_not_change_the_history_file(tmp_path: Path) -> None:
-    engine, _clock, path = _engine(tmp_path)
-    _close(engine, "walking", "kept")
+    engine, clock, path = _engine(tmp_path)
+    _close(engine, clock, "walking", "kept")
     before = path.read_text(encoding="utf-8")
 
     with pytest.raises(RuntimeError, match="bridge down"):
@@ -131,8 +131,8 @@ def test_a_failed_display_call_does_not_change_the_history_file(tmp_path: Path) 
 
 def test_startup_publish_uses_the_stored_grid(tmp_path: Path) -> None:
     clock = FakeClock(START)
-    engine, _stored_clock, _path = _engine(tmp_path / "data")
-    _close(engine, "walking", "kept")
+    engine, stored_clock, _path = _engine(tmp_path / "data")
+    _close(engine, stored_clock, "walking", "kept")
     display = RecordingDisplay()
 
     app = create_app(_settings(tmp_path), display=display, clock=clock)
@@ -202,9 +202,10 @@ def _draft(**overrides: object) -> ActivityDraft:
     )
 
 
-def _close(engine: SessionEngine, category: str, outcome: str) -> None:
+def _close(engine: SessionEngine, clock: FakeClock, category: str, outcome: str) -> None:
     proposal = engine.propose(_draft(category=category))
     session = engine.accept(proposal.id)
+    clock.advance(session.duration_minutes * 60)
     report = CompletionReport(outcome, None)  # type: ignore[arg-type]
     engine.report(session.id, report)
 

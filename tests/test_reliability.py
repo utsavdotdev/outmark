@@ -86,7 +86,7 @@ def test_restart_after_the_deadline_does_not_mark_the_session_kept(tmp_path: Pat
     ).test_client()
     body = restored.get("/api/session").get_json()
 
-    assert body["phase"] == "active"
+    assert body["phase"] == "awaiting_report"
     assert body["session"]["status"] == "active"
     assert body["session"]["deadline_passed"] is True
     assert (tmp_path / "data" / "outmark.json").read_text(encoding="utf-8") == before
@@ -95,8 +95,10 @@ def test_restart_after_the_deadline_does_not_mark_the_session_kept(tmp_path: Pat
 
 
 def test_the_window_rolls_forward_without_deleting_the_session(tmp_path: Path) -> None:
-    client = _client(tmp_path, RecordingDisplay(), _source(_Garbage()), FakeClock(START))
+    clock = FakeClock(START)
+    client = _client(tmp_path, RecordingDisplay(), _source(_Garbage()), clock)
     started = client.post("/api/session/start", json={"proposal_id": _propose(client)})
+    clock.advance(600)
     reported = client.post(
         "/api/session/report",
         json={
@@ -127,8 +129,10 @@ def test_the_window_rolls_forward_without_deleting_the_session(tmp_path: Path) -
 
 
 def test_a_failed_display_update_during_report_keeps_the_file(tmp_path: Path) -> None:
-    client = _client(tmp_path, _BrokenDisplay(), _source(_Garbage()), FakeClock(START))
+    clock = FakeClock(START)
+    client = _client(tmp_path, _BrokenDisplay(), _source(_Garbage()), clock)
     started = client.post("/api/session/start", json={"proposal_id": _propose(client)})
+    clock.advance(600)
     reported = client.post(
         "/api/session/report",
         json={

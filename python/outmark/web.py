@@ -88,7 +88,10 @@ def _respond(app: Flask, action: Any) -> Any:
     except ValidationError as exc:
         return jsonify({"error": str(exc)}), 400
     except TransitionError as exc:
-        return jsonify({"error": str(exc)}), 409
+        body: dict[str, Any] = {"error": str(exc)}
+        if exc.remaining_seconds is not None:
+            body["remaining_seconds"] = exc.remaining_seconds
+        return jsonify(body), 409
     except StorageError as exc:
         return jsonify({"error": str(exc)}), 503
     except Exception:
@@ -126,7 +129,7 @@ def _view(app: Flask, engine: SessionEngine) -> dict[str, Any]:
     proposal = engine.open_proposal()
     snapshot = engine.active_session()
     if snapshot is not None:
-        phase = "active"
+        phase = "awaiting_report" if snapshot.deadline_passed else "active"
     elif proposal is not None:
         phase = "proposed"
     else:

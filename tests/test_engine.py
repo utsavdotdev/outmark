@@ -62,7 +62,7 @@ def test_duplicate_reject_and_accept_leave_the_file_unchanged(tmp_path: Path) ->
 
 
 def test_duplicate_accept_and_report_leave_the_file_unchanged(tmp_path: Path) -> None:
-    engine, _clock, path = _engine(tmp_path)
+    engine, clock, path = _engine(tmp_path)
     proposal = engine.propose(_draft())
     session = engine.accept(proposal.id)
     before_second_accept = path.read_text(encoding="utf-8")
@@ -71,6 +71,7 @@ def test_duplicate_accept_and_report_leave_the_file_unchanged(tmp_path: Path) ->
         engine.accept(proposal.id)
     assert path.read_text(encoding="utf-8") == before_second_accept
 
+    clock.advance(session.duration_minutes * 60)
     engine.report(session.id, CompletionReport("kept", "A sparrow on the wall."))
     before_second_report = path.read_text(encoding="utf-8")
     with pytest.raises(TransitionError):
@@ -143,11 +144,11 @@ def test_restart_restores_the_active_session_from_wall_time(tmp_path: Path) -> N
 
 def test_not_kept_report_preserves_older_kept_cells(tmp_path: Path) -> None:
     engine, clock, _path = _engine(tmp_path, START.replace(month=9, day=28))
-    _close(engine, "walking", "kept", "The long way around the block.")
+    _close(engine, clock, "walking", "kept", "The long way around the block.")
     clock.set_wall(datetime(2026, 10, 9, 12, 0, tzinfo=ZONE))
-    _close(engine, "nature_observation", "kept", None)
+    _close(engine, clock, "nature_observation", "kept", None)
     clock.set_wall(datetime(2026, 10, 10, 12, 0, tzinfo=ZONE))
-    _close(engine, "walking", "not_kept", "I stayed at the desk.")
+    _close(engine, clock, "walking", "not_kept", "I stayed at the desk.")
 
     grid = engine.history()
 
@@ -162,7 +163,7 @@ def test_not_kept_report_preserves_older_kept_cells(tmp_path: Path) -> None:
 
 def test_days_outside_the_window_stay_in_the_file(tmp_path: Path) -> None:
     engine, clock, _path = _engine(tmp_path, datetime(2026, 9, 27, 12, 0, tzinfo=ZONE))
-    _close(engine, "walking", "kept", None)
+    _close(engine, clock, "walking", "kept", None)
     clock.set_wall(START)
 
     grid = engine.history()
@@ -172,9 +173,9 @@ def test_days_outside_the_window_stay_in_the_file(tmp_path: Path) -> None:
 
 
 def test_two_kept_activities_on_one_day_light_one_cell(tmp_path: Path) -> None:
-    engine, _clock, _path = _engine(tmp_path)
-    _close(engine, "walking", "kept", None)
-    _close(engine, "walking", "kept", "Second loop.")
+    engine, clock, _path = _engine(tmp_path)
+    _close(engine, clock, "walking", "kept", None)
+    _close(engine, clock, "walking", "kept", "Second loop.")
 
     assert engine.history().cells[0][12] is True
     assert sum(session.status is SessionStatus.KEPT for session in engine.sessions()) == 2
@@ -197,6 +198,40 @@ def test_corrupt_history_is_not_replaced(tmp_path: Path) -> None:
         SessionEngine(JsonStore(path), FakeClock(START))
 
     assert path.read_text(encoding="utf-8") == "{not json"
+
+
+def test_a_report_before_the_deadline_is_refused(tmp_path: Path) -> None:
+    engine, clock, path = _engine(tmp_path)
+    session = engine.accept(engine.propose(_draft(duration_minutes=5)).id)
+    clock.advance(299)
+    before = path.read_text(encoding="utf-8")
+
+    with pytest.raises(TransitionError, match="after the timer ends") as caught:
+        engine.report(session.id, CompletionReport("kept"))
+
+    assert caught.value.remaining_seconds == 1
+    assert path.read_text(encoding="utf-8") == before
+    assert engine.sessions()[0].status is SessionStatus.ACTIVE
+
+    clock.advance(1)
+    reported = engine.report(session.id, CompletionReport("kept", "The full five minutes."))
+
+    assert reported.status is SessionStatus.KEPT
+    with pytest.raises(TransitionError, match="only an active session"):
+        engine.report(session.id, CompletionReport("kept"))
+    assert len(engine.sessions()) == 1
+
+
+def test_not_kept_is_also_refused_before_the_deadline(tmp_path: Path) -> None:
+    engine, clock, path = _engine(tmp_path)
+    session = engine.accept(engine.propose(_draft(duration_minutes=5)).id)
+    clock.advance(299)
+    before = path.read_text(encoding="utf-8")
+
+    with pytest.raises(TransitionError, match="after the timer ends"):
+        engine.report(session.id, CompletionReport("not_kept"))
+
+    assert path.read_text(encoding="utf-8") == before
 
 
 def test_another_suggestion_is_allowed_after_rejection(tmp_path: Path) -> None:
@@ -235,7 +270,14 @@ def _draft(**overrides: object) -> ActivityDraft:
     )
 
 
-def _close(engine: SessionEngine, category: str, outcome: str, reflection: str | None) -> None:
+def _close(
+    engine: SessionEngine,
+    clock: FakeClock,
+    category: str,
+    outcome: str,
+    reflection: str | None,
+) -> None:
     proposal = engine.propose(_draft(category=category))
     session = engine.accept(proposal.id)
+    clock.advance(session.duration_minutes * 60)
     engine.report(session.id, CompletionReport(outcome, reflection))  # type: ignore[arg-type]
