@@ -41,10 +41,16 @@ def test_valid_model_json_keeps_the_requested_duration() -> None:
     assert result.activity.duration_minutes == 5
     assert result.activity.category == "nature_observation"
     assert result.activity.title == "Notice three leaves"
+    assert result.activity.instructions.startswith(
+        "Spend 5 minutes outside noticing plants, sky, or the ground."
+    )
     assert client.calls == 1
 
 
-def test_fenced_json_is_accepted() -> None:
+def test_thinking_text_is_ignored_and_the_json_after_it_is_used() -> None:
+    body = '<think>Maybe birds. {"title":"no"}</think>\n' + _activity_json()
+    activity = parse_activity(body, 10)
+    assert activity.title == "Notice three leaves"
     body = "```json\n" + _activity_json() + "\n```"
     activity = parse_activity(body, 10)
     assert activity.title == "Notice three leaves"
@@ -53,7 +59,6 @@ def test_fenced_json_is_accepted() -> None:
 def test_malformed_invalid_and_completion_claims_use_the_catalog() -> None:
     cases = [
         "not json",
-        _activity_json(category="skydiving"),
         _activity_json(instructions=""),
         _activity_json(instructions="You have completed this walk."),
     ]
@@ -90,6 +95,8 @@ def test_a_public_model_url_is_not_called() -> None:
     assert result.activity.category == "quiet_outdoor"
     assert is_local_model_url("https://api.openai.com/v1/chat/completions") is False
     assert is_local_model_url("http://127.0.0.1:8081/v1/chat/completions") is True
+    assert is_local_model_url("http://llamacpp-models-runner:9999/v1/chat/completions") is True
+    assert is_local_model_url("http://some-other-container:9999/v1/chat/completions") is False
 
 
 def test_invalid_duration_does_not_call_the_model() -> None:
@@ -129,8 +136,33 @@ def test_recent_reflection_is_included_in_the_prompt(tmp_path: Path) -> None:
     user = client.payloads[0]["messages"][1]["content"]
     system = client.payloads[0]["messages"][0]["content"]
     assert "The leaves were wet." in user
-    assert "You are Outmark" in system
+    assert "Walking and movement" in user
+    assert "You write one short outdoor activity as JSON." in system
     assert "Authorization" not in json.dumps(client.payloads[0])
+
+
+def test_a_rejected_suggestion_is_avoided_and_the_category_stays(tmp_path: Path) -> None:
+    engine, _path, _clock = _engine(tmp_path)
+    engine.reject(engine.propose(_draft()).id)
+    client = _Scripted(
+        _activity_json(
+            title="Bird Spotting",
+            category="creative_observation",
+            instructions="Watch three birds.",
+        )
+    )
+
+    result = LlamaServerSource(client=client).generate(request_from_engine(engine, 5, "walking"))
+
+    user = str(client.payloads[0]["messages"][1]["content"])
+    assert "Walk a familiar block" in user
+    assert "Category id: walking." in user
+    assert result.activity.category == "walking"
+    assert result.activity.duration_minutes == 5
+    assert result.source == "fallback"
+    assert result.activity.title != "Bird Spotting"
+    assert client.payloads[0]["temperature"] == 0.4
+    assert isinstance(client.payloads[0]["seed"], int)
 
 
 def test_urllib_client_posts_to_loopback_without_an_api_key() -> None:
@@ -154,7 +186,8 @@ def test_app_prepares_a_local_source_without_calling_it(tmp_path: Path) -> None:
     source = app.config["OUTMARK_ACTIVITY_SOURCE"]
 
     assert isinstance(source, LlamaServerSource)
-    assert source.chat_url == "http://127.0.0.1:8081/v1/chat/completions"
+    assert source.chat_url == "http://llamacpp-models-runner:9999/v1/chat/completions"
+    assert source.model == "Qwen3.5-0.8B-Q4_0"
     assert app.test_client().get("/health").status_code == 200
 
 

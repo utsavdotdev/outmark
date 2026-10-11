@@ -235,6 +235,11 @@ function showModel(source) {
     modelNote.textContent = "The local model did not answer. This suggestion comes from the catalog.";
     return;
   }
+  if (source === "model") {
+    modelNote.hidden = true;
+    modelNote.textContent = "";
+    return;
+  }
   if (!modelPresent) {
     modelNote.hidden = false;
     modelNote.textContent = "No model file is installed. Suggestions come from the built-in catalog.";

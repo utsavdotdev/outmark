@@ -5,6 +5,8 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import random
+import re
 import urllib.error
 import urllib.request
 from typing import Protocol
@@ -14,7 +16,7 @@ from outmark.catalog import choose_fallback
 from outmark.engine import SessionEngine
 from outmark.errors import LocalModelError, ValidationError
 from outmark.generator_types import GenerationRequest, GenerationResult
-from outmark.prompts import SYSTEM_PROMPT, user_message
+from outmark.prompts import MISFIT, SYSTEM_PROMPT, opening_line, user_message
 from outmark.records import ActivityDraft
 from outmark.validation import (
     INSTRUCTIONS_LIMIT,
@@ -27,8 +29,8 @@ from outmark.validation import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_LLM_URL = "http://127.0.0.1:8081/v1/chat/completions"
-DEFAULT_LLM_MODEL = "qwen2.5-0.5b-instruct"
+DEFAULT_LLM_URL = "http://llamacpp-models-runner:9999/v1/chat/completions"
+DEFAULT_LLM_MODEL = "Qwen3.5-0.8B-Q4_0"
 _COMPLETION_CLAIMS = (
     "you have completed",
     "you already completed",
@@ -66,9 +68,14 @@ class UrllibChatClient:
         )
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                parsed = json.loads(response.read().decode("utf-8"))
+                raw = response.read().decode("utf-8")
+            parsed = json.loads(raw)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:240].strip()
+            message = f"the local model request failed: HTTP {exc.code} {detail}"
+            raise LocalModelError(message) from exc
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-            raise LocalModelError("the local model request failed") from exc
+            raise LocalModelError(f"the local model request failed: {exc}") from exc
         return _assistant_text(parsed)
 
 
@@ -79,7 +86,7 @@ class LlamaServerSource:
         self,
         chat_url: str = DEFAULT_LLM_URL,
         model: str = DEFAULT_LLM_MODEL,
-        timeout: float = 60.0,
+        timeout: float = 180.0,
         client: ChatClient | None = None,
     ) -> None:
         self.chat_url = normalize_chat_url(chat_url)
@@ -103,7 +110,11 @@ class LlamaServerSource:
                 _payload(self.model, prepared),
                 self.timeout,
             )
-            activity = parse_activity(content, prepared.duration_minutes)
+            activity = parse_activity(
+                content,
+                prepared.duration_minutes,
+                prepared.preferred_category,
+            )
         except (LocalModelError, ValidationError, ValueError) as exc:
             logger.info("Local generation failed (%s). Using a catalog activity.", exc)
             return _fallback(prepared)
@@ -135,9 +146,13 @@ def request_from_engine(
     duration_minutes: object,
     preferred_category: object,
 ) -> GenerationRequest:
-    """Use the latest stored sessions, including reflections, as model context."""
+    """Use recent proposals and sessions, including reflections, as model context."""
     activities: list[str] = []
     reflections: list[str] = []
+    for proposal in engine.proposals()[-8:]:
+        activities.append(proposal.title)
+        if proposal.instructions and proposal.instructions != proposal.title:
+            activities.append(proposal.instructions)
     for session in engine.sessions()[-5:]:
         activities.append(session.title)
         if session.quest and session.quest != session.title:
@@ -147,13 +162,17 @@ def request_from_engine(
     return prepare_request(
         duration_minutes,
         preferred_category,
-        tuple(activities),
-        tuple(reflections),
+        _unique(activities)[-12:],
+        tuple(reflections[-5:]),
     )
 
 
-def parse_activity(content: str, duration_minutes: int) -> ActivityDraft:
-    """Accept one JSON object. The requested duration is kept even if the model names another."""
+def parse_activity(
+    content: str,
+    duration_minutes: int,
+    category: str | None = None,
+) -> ActivityDraft:
+    """Accept one JSON object. Duration and category stay with the request."""
     raw = _extract_json(content)
     if not isinstance(raw, dict):
         raise ValidationError("model response must be a JSON object")
@@ -164,9 +183,15 @@ def parse_activity(content: str, duration_minutes: int) -> ActivityDraft:
     instructions = require_text(raw.get("instructions"), "instructions", INSTRUCTIONS_LIMIT)
     question = require_text(raw.get("reflection_question"), "reflection_question", QUESTION_LIMIT)
     _reject_completion_claim(title, instructions, question)
+    chosen = category if category is not None else raw.get("category")
+    chosen_category = require_category(chosen)
+    if category is not None:
+        _reject_misfit(chosen_category, title, instructions)
+        instructions = _align_instructions(instructions, duration_minutes, chosen_category)
+        instructions = require_text(instructions, "instructions", INSTRUCTIONS_LIMIT)
     return ActivityDraft(
         duration_minutes=duration_minutes,
-        category=require_category(raw.get("category")),
+        category=chosen_category,
         title=title,
         instructions=instructions,
         reflection_question=question,
@@ -174,14 +199,14 @@ def parse_activity(content: str, duration_minutes: int) -> ActivityDraft:
 
 
 def is_local_model_url(url: str) -> bool:
-    """Allow loopback and private addresses only. Hostnames other than localhost are refused."""
+    """Allow loopback, private addresses, and the App Lab LLM brick hostname."""
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
         return False
     host = parsed.hostname
     if host is None:
         return False
-    if host.lower() == "localhost":
+    if host.lower() in {"localhost", "llamacpp-models-runner"}:
         return True
     try:
         address = ipaddress.ip_address(host)
@@ -206,8 +231,21 @@ def _payload(model: str, request: GenerationRequest) -> dict[str, object]:
             {"role": "user", "content": user_message(request)},
         ],
         "temperature": 0.4,
-        "max_tokens": 200,
+        "seed": random.randint(1, 2_147_483_646),
+        "max_tokens": 240,
     }
+
+
+def _unique(items: list[str]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    kept: list[str] = []
+    for item in items:
+        key = item.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(item)
+    return tuple(kept)
 
 
 def _fallback(request: GenerationRequest) -> GenerationResult:
@@ -220,7 +258,7 @@ def _fallback(request: GenerationRequest) -> GenerationResult:
 
 
 def _extract_json(content: str) -> object:
-    text = content.strip()
+    text = _strip_thinking(content.strip())
     if text.startswith("```"):
         newline = text.find("\n")
         text = text[newline + 1 :] if newline != -1 else text
@@ -235,6 +273,34 @@ def _extract_json(content: str) -> object:
         return json.loads(text[start : end + 1])
     except json.JSONDecodeError as exc:
         raise ValidationError("model response was not valid JSON") from exc
+
+
+def _strip_thinking(text: str) -> str:
+    end = text.rfind("</think>")
+    if end != -1:
+        return text[end + len("</think>") :].strip()
+    return text
+
+
+def _reject_misfit(category: str, *fields: str) -> None:
+    text = " ".join(fields).casefold()
+    for phrase in MISFIT[category]:
+        if re.search(rf"\b{re.escape(phrase)}\b", text):
+            raise ValidationError("model response does not match the chosen category")
+
+
+def _align_instructions(instructions: str, duration: int, category: str) -> str:
+    opening = opening_line(duration, category)
+    body = instructions.strip()
+    if body.casefold().startswith(opening.casefold()):
+        return body
+    if body.casefold().startswith("spend ") and " minute" in body.casefold()[:80]:
+        dot = body.find(".")
+        if dot != -1:
+            body = body[dot + 1 :].strip()
+    if not body:
+        return opening
+    return f"{opening} {body}"
 
 
 def _assistant_text(payload: object) -> str:
