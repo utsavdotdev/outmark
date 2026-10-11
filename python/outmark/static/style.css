@@ -23,8 +23,8 @@ body {
 }
 
 main {
-  max-width: 40rem;
-  padding: 4.5rem 1.5rem 3rem;
+  max-width: 56rem;
+  padding: 3.5rem 1.5rem 3rem;
 }
 
 .mark {
@@ -138,6 +138,22 @@ button.primary {
   color: var(--paper);
 }
 
+button:disabled,
+textarea:disabled,
+select:disabled,
+input:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--rule);
+  outline-offset: 3px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -196,4 +212,95 @@ button.primary {
 .empty {
   color: var(--muted);
   font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.mast {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-end;
+}
+
+.mast .mark {
+  margin: 0 0 0.35rem;
+}
+
+.split {
+  display: grid;
+  gap: 2.5rem;
+  margin-top: 2rem;
+}
+
+#session,
+#history {
+  margin-top: 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--rule);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.timer-panel {
+  padding-top: 0.25rem;
+}
+
+.timer-face {
+  position: relative;
+  width: min(16rem, 70vw);
+  margin: 0.5rem 0 1.25rem;
+}
+
+.timer-face svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ring-track,
+.ring-value {
+  fill: none;
+  stroke-width: 5;
+}
+
+.ring-track {
+  stroke: var(--rule);
+  opacity: 0.28;
+}
+
+.ring-value {
+  stroke: var(--rule);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+}
+
+.timer-face .timer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: 2.6rem;
+  letter-spacing: -0.03em;
+}
+
+#board-note {
+  font-size: 0.85rem;
+}
+
+@media (min-width: 800px) {
+  .split {
+    grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
+    align-items: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-value {
+    transition: none;
+  }
 }

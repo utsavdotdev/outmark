@@ -19,10 +19,16 @@ const categoryLabels = new Map(
   [...document.querySelectorAll("#category option")].map((option) => [option.value, option.textContent]),
 );
 
+const timerState = document.querySelector("#timer-state");
+const activeMeta = document.querySelector("#active-meta");
+const ring = document.querySelector("#ring");
+const ringLength = 2 * Math.PI * 52;
+
 let modelPresent = false;
 let proposalId = null;
 let sessionId = null;
 let poll = null;
+let reportOpen = false;
 
 setup.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -78,7 +84,7 @@ async function accept() {
   try {
     const state = await sendJson("/api/session/start", { proposal_id: proposalId });
     renderState(state);
-    statusNode.textContent = "The timer is running. You can close this page.";
+    statusNode.textContent = "Your commitment is in progress.";
   } catch (error) {
     statusNode.textContent = error.message;
   } finally {
@@ -123,7 +129,10 @@ function statusFor(phase) {
     return "One suggestion. Accept it, or reject it and ask again.";
   }
   if (phase === "active") {
-    return "The timer is running. You can close this page.";
+    return "Your commitment is in progress.";
+  }
+  if (phase === "awaiting_report") {
+    return "Time's up. How did it go?";
   }
   return "Choose a duration and a category.";
 }
@@ -144,6 +153,7 @@ function showSetup() {
   stopPoll();
   proposalId = null;
   sessionId = null;
+  reportOpen = false;
   setup.hidden = false;
   proposalPanel.hidden = true;
   activePanel.hidden = true;
@@ -166,19 +176,38 @@ function showActive(session) {
   const changed = sessionId !== session.id;
   sessionId = session.id;
   proposalId = null;
+  reportOpen = session.deadline_passed === true;
   if (changed) {
     activeTitle.textContent = session.title;
     activeQuest.textContent = session.quest;
     activeQuestion.textContent = session.reflection_question;
+    activeMeta.textContent = `${session.duration_minutes} minutes · ${labelFor(session.category)}`;
     reflectionNode.value = "";
     startPoll();
   }
-  timerNode.textContent = session.deadline_passed
-    ? "Time is up. Say whether you kept this commitment."
-    : `${formatRemaining(session.remaining_seconds)} left`;
+  timerState.textContent = reportOpen
+    ? "Time's up. How did it go?"
+    : "Your commitment is in progress.";
+  timerNode.textContent = formatRemaining(session.remaining_seconds);
+  paintRing(session);
+  lockReports();
   setup.hidden = true;
   proposalPanel.hidden = true;
   activePanel.hidden = false;
+}
+
+function paintRing(session) {
+  const total = session.duration_minutes * 60;
+  const elapsed = Math.min(total, Math.max(0, session.elapsed_seconds));
+  const ratio = total === 0 ? 0 : elapsed / total;
+  ring.style.strokeDasharray = String(ringLength);
+  ring.style.strokeDashoffset = String(ringLength * (1 - ratio));
+}
+
+function lockReports() {
+  document.querySelector("#kept").disabled = !reportOpen;
+  document.querySelector("#not-kept").disabled = !reportOpen;
+  reflectionNode.disabled = !reportOpen;
 }
 
 function showModel(source) {
@@ -240,7 +269,7 @@ function startPoll() {
   poll = setInterval(() => {
     readJson("/api/session")
       .then((state) => {
-        if (state.phase === "active") {
+        if (state.phase === "active" || state.phase === "awaiting_report") {
           renderState(state);
         }
       })
@@ -261,6 +290,9 @@ function setBusy(busy) {
   document.querySelector("#app").setAttribute("aria-busy", busy ? "true" : "false");
   for (const control of document.querySelectorAll("button, select, textarea, input")) {
     control.disabled = busy;
+  }
+  if (!busy) {
+    lockReports();
   }
 }
 

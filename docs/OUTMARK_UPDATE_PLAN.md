@@ -76,3 +76,4 @@ Each stage is one commit, in order, after `ruff` and `pytest`. Nothing is pushed
 ## Progress
 
 - Stage 1: `engine.report` rejects both outcomes until the monotonic clock reaches the duration. The route returns 409 and `remaining_seconds`. `phase` is `awaiting_report` after the deadline while status stays `active`. 57 tests passed.
+- Stage 2: the page uses the same type and colors, with a dedicated countdown ring. Report buttons stay disabled until `awaiting_report`.
