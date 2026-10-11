@@ -78,3 +78,4 @@ Each stage is one commit, in order, after `ruff` and `pytest`. Nothing is pushed
 - Stage 1: `engine.report` rejects both outcomes until the monotonic clock reaches the duration. The route returns 409 and `remaining_seconds`. `phase` is `awaiting_report` after the deadline while status stays `active`. 57 tests passed.
 - Stage 2: the page uses the same type and colors, with a dedicated countdown ring. Report buttons stay disabled until `awaiting_report`.
 - Stage 3: history entries are grouped by day and show time, duration, category, outcome, and an optional reflection. An expired timer stays on the countdown instead of returning to the setup form.
+- Stage 4: plant stage is `min(5, kept sessions)`, returned on the session and history payloads. The page draws that stage. Reject, expiry, `not_kept`, an early report, and a duplicate report do not advance it. 63 tests passed.

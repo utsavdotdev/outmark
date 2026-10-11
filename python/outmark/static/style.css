@@ -272,9 +272,75 @@ input:focus-visible {
   margin-top: 2rem;
 }
 
+.side {
+  display: grid;
+  gap: 2.5rem;
+  align-content: start;
+}
+
 #session,
-#history {
+#history,
+#plant {
   margin-top: 0;
+}
+
+#plant-drawing {
+  display: block;
+  width: min(11rem, 70vw);
+  height: auto;
+  margin-top: 0.4rem;
+  color: var(--ink);
+  overflow: visible;
+  transform-origin: 50% 88%;
+  animation: plant-breathe 7s ease-in-out infinite;
+}
+
+#plant-drawing [data-stage] {
+  display: none;
+}
+
+#plant-drawing[data-stage="0"] [data-stage="0"],
+#plant-drawing[data-stage="1"] [data-stage="1"],
+#plant-drawing[data-stage="2"] [data-stage="2"],
+#plant-drawing[data-stage="3"] [data-stage="3"],
+#plant-drawing[data-stage="4"] [data-stage="4"],
+#plant-drawing[data-stage="5"] [data-stage="5"] {
+  display: inline;
+}
+
+#plant-drawing .ground,
+#plant-drawing path,
+#plant-drawing line,
+#plant-drawing ellipse,
+#plant-drawing circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#plant-drawing.grew {
+  animation: plant-grow 0.8s ease;
+}
+
+@keyframes plant-breathe {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(1.1deg);
+  }
+}
+
+@keyframes plant-grow {
+  0% {
+    transform: translateY(4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .eyebrow {
@@ -344,5 +410,10 @@ input:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .ring-value {
     transition: none;
+  }
+
+  #plant-drawing,
+  #plant-drawing.grew {
+    animation: none;
   }
 }

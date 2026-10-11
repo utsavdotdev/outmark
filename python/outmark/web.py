@@ -14,6 +14,7 @@ from outmark.display import publish
 from outmark.engine import SessionEngine
 from outmark.errors import StorageError, TransitionError, ValidationError
 from outmark.generator import ActivitySource, request_from_engine
+from outmark.plant import plant_state
 from outmark.records import CompletionReport, SessionSnapshot
 from outmark.validation import require_outcome
 
@@ -140,6 +141,7 @@ def _view(app: Flask, engine: SessionEngine) -> dict[str, Any]:
         "model_present": model_is_present(settings.model_dir),
         "proposal": None if proposal is None else proposal.to_dict(),
         "session": None if snapshot is None else _snapshot(snapshot),
+        "plant": plant_state(engine.sessions()),
     }
 
 
@@ -169,6 +171,7 @@ def _history(engine: SessionEngine) -> dict[str, Any]:
             for index, (category_id, label) in enumerate(CATEGORIES)
         ],
         "sessions": list(reversed(visible)),
+        "plant": plant_state(engine.sessions()),
     }
 
 

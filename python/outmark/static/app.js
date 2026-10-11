@@ -15,6 +15,8 @@ const reflectionNode = document.querySelector("#reflection");
 const gridNode = document.querySelector("#grid");
 const sessionsNode = document.querySelector("#sessions");
 const historyRange = document.querySelector("#history-range");
+const plantLabel = document.querySelector("#plant-label");
+const plantDrawing = document.querySelector("#plant-drawing");
 const categoryLabels = new Map(
   [...document.querySelectorAll("#category option")].map((option) => [option.value, option.textContent]),
 );
@@ -29,6 +31,7 @@ let proposalId = null;
 let sessionId = null;
 let poll = null;
 let reportOpen = false;
+let plantStage = null;
 
 setup.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -138,6 +141,7 @@ function statusFor(phase) {
 }
 
 function renderState(state) {
+  showPlant(state.plant);
   if (state.phase === "proposed" && state.proposal) {
     showProposal(state.proposal);
     return;
@@ -225,8 +229,21 @@ function showModel(source) {
   modelNote.textContent = "";
 }
 
+function showPlant(plant) {
+  if (!plant) {
+    return;
+  }
+  const next = Number(plant.stage);
+  const grew = plantStage !== null && next > plantStage;
+  plantStage = next;
+  plantLabel.textContent = plant.label;
+  plantDrawing.dataset.stage = String(next);
+  plantDrawing.classList.toggle("grew", grew);
+}
+
 async function renderHistory() {
   const history = await readJson("/api/history");
+  showPlant(history.plant);
   historyRange.textContent = `${history.start_date} through ${history.end_date}. A filled cell is a kept commitment.`;
   gridNode.replaceChildren();
   for (const row of history.rows) {
