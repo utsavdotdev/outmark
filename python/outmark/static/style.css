@@ -201,12 +201,54 @@ input:focus-visible {
 
 #sessions li {
   margin: 0;
-  padding: 0.9rem 0;
+  padding: 0;
+  border: 0;
+}
+
+.log-day {
+  margin-top: 1.1rem;
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.log-entry {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+  gap: 0.15rem 0.75rem;
+  padding: 0.7rem 0;
   border-top: 1px solid var(--rule);
 }
 
-#sessions p {
-  margin: 0.35rem 0 0;
+.log-time,
+.log-detail,
+.log-outcome,
+.log-note {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+
+.log-time,
+.log-detail,
+.log-outcome {
+  color: var(--muted);
+}
+
+.log-title {
+  font-size: 1.02rem;
+}
+
+.log-detail,
+.log-note {
+  grid-column: 2 / -1;
+}
+
+.log-note {
+  color: var(--ink);
+  line-height: 1.4;
 }
 
 .empty {

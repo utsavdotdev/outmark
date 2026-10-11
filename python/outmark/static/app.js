@@ -142,7 +142,7 @@ function renderState(state) {
     showProposal(state.proposal);
     return;
   }
-  if (state.phase === "active" && state.session) {
+  if ((state.phase === "active" || state.phase === "awaiting_report") && state.session) {
     showActive(state.session);
     return;
   }
@@ -248,20 +248,50 @@ async function renderHistory() {
     sessionsNode.append(item);
     return;
   }
+  let day = "";
   for (const session of history.sessions) {
+    const stamp = session.started_at || "";
+    const nextDay = stamp.slice(0, 10);
+    if (nextDay !== day) {
+      day = nextDay;
+      const heading = document.createElement("li");
+      heading.className = "log-day";
+      heading.textContent = day;
+      sessionsNode.append(heading);
+    }
     const item = document.createElement("li");
-    const title = document.createElement("strong");
+    item.className = "log-entry";
+    const time = document.createElement("span");
+    time.className = "log-time";
+    time.textContent = stamp.slice(11, 16);
+    const title = document.createElement("span");
+    title.className = "log-title";
     title.textContent = session.title;
+    const outcome = document.createElement("span");
+    outcome.className = "log-outcome";
+    outcome.textContent = outcomeLabel(session.status);
     const detail = document.createElement("p");
-    detail.textContent = `${labelFor(session.category)} · ${session.status.replace("_", " ")}`;
-    item.append(title, detail);
+    detail.className = "log-detail";
+    detail.textContent = `${session.duration_minutes} min · ${labelFor(session.category)}`;
+    item.append(time, title, outcome, detail);
     if (session.reflection) {
       const note = document.createElement("p");
+      note.className = "log-note";
       note.textContent = session.reflection;
       item.append(note);
     }
     sessionsNode.append(item);
   }
+}
+
+function outcomeLabel(status) {
+  if (status === "kept") {
+    return "Kept";
+  }
+  if (status === "not_kept") {
+    return "Not kept";
+  }
+  return "In progress";
 }
 
 function startPoll() {
