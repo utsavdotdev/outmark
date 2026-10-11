@@ -28,7 +28,7 @@ from outmark.display import (
 )
 from outmark.engine import SessionEngine
 from outmark.errors import DisplayError
-from outmark.frames import EVENT_KEPT, EVENT_MODE, EVENT_NOT_KEPT, EVENT_STARTUP, VIEW_PLANT
+from outmark.frames import EVENT_KEPT, EVENT_NOT_KEPT, EVENT_STARTUP, VIEW_CHART
 from outmark.records import ActivityDraft, CompletionReport, SessionStatus
 from outmark.storage import JsonStore
 
@@ -161,29 +161,15 @@ def test_a_corrupt_history_file_does_not_stop_the_web_server(tmp_path: Path) -> 
     assert app.config["OUTMARK_ENGINE"] is None
 
 
-def test_display_mode_is_saved_and_restored(tmp_path: Path) -> None:
+def test_the_page_does_not_offer_a_plant(tmp_path: Path) -> None:
     display = RecordingDisplay()
-    app = create_app(_settings(tmp_path), display=display, clock=FakeClock(START))
-    client = app.test_client()
+    client = create_app(_settings(tmp_path), display=display, clock=FakeClock(START)).test_client()
     page = client.get("/").get_data(as_text=True)
-    assert "Plant growth" in page
-    assert "Activity chart" in page
 
-    refused = client.post("/api/display-mode", json={"display_mode": "both"})
-    chosen = client.post("/api/display-mode", json={"display_mode": "plant"})
-
-    assert refused.status_code == 400
-    assert chosen.status_code == 200
-    assert chosen.get_json()["display_mode"] == "plant"
-    assert chosen.get_json()["display_connected"] is True
-    assert ("set_view", VIEW_PLANT) in display.calls
-    assert any(call[1] == EVENT_MODE for call in display.calls if call[0] == "set_event")
-
-    restored = RecordingDisplay()
-    create_app(_settings(tmp_path), display=restored, clock=FakeClock(START))
-    assert ("set_view", VIEW_PLANT) in restored.calls
-    assert any(call[1] == EVENT_STARTUP for call in restored.calls if call[0] == "set_event")
-    assert not any(call[1] == EVENT_KEPT for call in restored.calls if call[0] == "set_event")
+    assert "Plant growth" not in page
+    assert "plant-drawing" not in page
+    assert client.post("/api/display-mode", json={"display_mode": "plant"}).status_code == 404
+    assert ("set_view", VIEW_CHART) in display.calls
 
 
 def test_kept_growth_is_sent_once_and_a_restart_does_not_repeat_it(tmp_path: Path) -> None:
@@ -205,14 +191,15 @@ def test_kept_growth_is_sent_once_and_a_restart_does_not_repeat_it(tmp_path: Pat
     assert event is not None
     assert event[0] == EVENT_KEPT
     assert display.calls[0] == ("set_event", EVENT_KEPT, event[1])
-    assert display.calls[1] == ("set_plant", 1)
+    assert ("set_view", VIEW_CHART) in display.calls
+    assert not any(call[0] == "set_plant" for call in display.calls)
     assert tracker.observe(engine) is None
 
     restarted = RecordingDisplay()
     restarted_tracker = DisplayTracker()
     restarted_engine = SessionEngine(JsonStore(path), FakeClock(clock.wall()))
     publish(restarted_engine, restarted, restarted_tracker.observe(restarted_engine))
-    assert ("set_plant", 1) in restarted.calls
+    assert ("set_view", VIEW_CHART) in restarted.calls
     assert [call[1] for call in restarted.calls if call[0] == "set_event"] == [EVENT_STARTUP]
     assert restarted_tracker.observe(restarted_engine) is None
 
@@ -234,7 +221,8 @@ def test_not_kept_does_not_send_growth(tmp_path: Path) -> None:
 
     assert event is not None
     assert event[0] == EVENT_NOT_KEPT
-    assert ("set_plant", 0) in display.calls
+    assert ("set_view", VIEW_CHART) in display.calls
+    assert not any(call[0] == "set_plant" for call in display.calls)
     assert not any(call[1] == EVENT_KEPT for call in display.calls if call[0] == "set_event")
 
 

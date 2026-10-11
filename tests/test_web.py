@@ -34,7 +34,7 @@ def test_home_page_offers_the_commitment_flow(tmp_path: Path) -> None:
     assert "I kept it" in page
     assert "I did not keep it" in page
     assert "Reflection" in page
-    assert "History" in page
+    assert "Past activity" in page
     assert "Writing a suggestion" in script
     assert "The local model did not answer" in script
     assert "No model file is installed" in script
@@ -52,7 +52,7 @@ def test_the_page_keeps_the_theme_and_the_timer_copy(tmp_path: Path) -> None:
     assert "prefers-reduced-motion" in css
     assert "Your commitment is in progress." in script
     assert "Time's up. How did it go?" in script
-    assert "Saved here. The board has not accepted it." in script
+    assert "Plant growth" not in client.get("/").get_data(as_text=True)
 
 
 def test_quest_shows_one_proposal_and_leaves_the_matrix_idle(tmp_path: Path) -> None:

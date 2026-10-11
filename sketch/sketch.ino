@@ -39,6 +39,7 @@ static const int CENTER_COL = 6;
 static const int MASK_MAX = (1 << COLS) - 1;
 static const unsigned long FRAME_MS = 160;
 static const unsigned long BREATHE_MS = 900;
+static const unsigned long PULSE_MS = 900;
 
 static const uint8_t DONE_PIXELS[][2] = {
     {4, 2},
@@ -71,6 +72,7 @@ static int eventCode = 0;
 static int lastGeneration = -1;
 static int animFrame = -1;
 static int breathePhase = 0;
+static int pulsePhase = 1;
 static unsigned long animStart = 0;
 static uint8_t frame[ROWS * COLS];
 
@@ -106,6 +108,12 @@ void loop() {
         animFrame = index;
         dirty = true;
       }
+    }
+  } else if (view == VIEW_CHART && (mode == MODE_REST || mode == MODE_PENDING || mode == MODE_ACTIVE)) {
+    int phase = static_cast<int>((now / PULSE_MS) % 2);
+    if (phase != pulsePhase) {
+      pulsePhase = phase;
+      dirty = true;
     }
   } else if (view == VIEW_PLANT && (mode == MODE_REST || mode == MODE_GRID)) {
     int phase = static_cast<int>((now / BREATHE_MS) % 2);
@@ -212,6 +220,21 @@ int growth_count() {
   return (to - from) + 4;
 }
 
+// Turns one non-history pixel off on alternate beats. The stored chart is unchanged.
+void pulse_mark() {
+  if (mode == MODE_ACTIVE && progress > 0) {
+    frame[PROGRESS_ROW * COLS + progress - 1] = 0;
+    return;
+  }
+  if (mode == MODE_PENDING) {
+    frame[CENTER_COL] = 0;
+    return;
+  }
+  if (mode == MODE_REST) {
+    frame[PROGRESS_ROW * COLS + CENTER_COL] = 0;
+  }
+}
+
 void render() {
   if (animating) {
     paint_event(animFrame < 0 ? 0 : animFrame);
@@ -219,6 +242,9 @@ void render() {
     paint_destination();
     if (breathePhase == 1 && view == VIEW_PLANT && (mode == MODE_REST || mode == MODE_GRID)) {
       frame[0] = 1;
+    }
+    if (pulsePhase == 0 && view == VIEW_CHART) {
+      pulse_mark();
     }
   }
   matrix.draw(frame);

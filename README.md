@@ -41,14 +41,14 @@ Stop the server with Ctrl-C. On macOS, ports 5000 and 7000 are often taken by Ai
 
 The page is the only input. It asks for 5, 10, or 15 minutes and one of eight categories, then shows one suggestion. The type and colors are unchanged: Iowan Old Style for the title, a system sans for the controls, ink `#1a1814`, paper `#f3efe6`, and rule `#2f5f8a`.
 
-- **Another suggestion** rejects that proposal. Nothing is timed, and the plant does not grow.
-- **Accept and start** is the only action that starts the timer. The countdown is a ring driven by the server's remaining time. The timer keeps going if the browser closes.
-- **I kept it** and **I did not keep it** stay disabled until the full duration has elapsed. The server rejects an earlier report with HTTP 409 and the remaining time. Expiry does not choose either outcome.
+The layout is three panels. The promise panel (duration and category chips, then the suggestion, then the running promise) sits beside the timer. The board, a copy of the thirteen-day chart on the matrix, comes next. Past activity is a collapsed list at the bottom.
+
+- **Another suggestion** rejects that proposal. Nothing is timed.
+- **Accept and start** is the only action that starts the timer. The ring previews the chosen minutes while idle, then counts down from the server's remaining time. The timer keeps going if the browser closes.
+- The report actions stay hidden until the full duration has elapsed. The server rejects an earlier report with HTTP 409 and the remaining time. Expiry does not choose either outcome.
 - After the deadline the status reads "Time's up. How did it go?" A reflection is optional.
-- Only a kept report lights a history cell and advances the plant. A not-kept report is stored, does not clear older cells, and does not remove growth.
-- The plant stage is the number of kept sessions, capped at five: seed, split seed, sprout, two leaves, growing plant, flowering plant. It is computed from the file, so a restart cannot award it twice.
-- **Matrix** chooses Plant growth or Activity chart. The choice is stored in `data/outmark.json`. Older files without that field stay on the chart. If the board does not accept the update, the page says so and keeps the saved choice.
-- History is grouped by day. Each entry shows the time, title, duration, category, outcome, and reflection when there is one.
+- Only a kept report lights a history cell. A not-kept report is stored and does not clear older cells.
+- The matrix shows the activity chart. While idle, waiting, or timing, one non-history pixel pulses. Past activity lists each session with its outcome and reflection.
 - If no model file is installed, or the local model does not answer, the page says so and uses a built-in catalog. That catalog path was used in the browser check on this computer.
 
 ## Architecture
@@ -63,18 +63,18 @@ browser  ->  Flask on the Linux MPU  ->  session engine and data/outmark.json
                                     STM32 sketch draws the matrix
 ```
 
-The model returns text only. Display commands are small integers: a mode, a progress count from 0 to 13, eight row masks, a view (`0` chart, `1` plant), a plant stage, and a one-shot event. The five-second refresh repeats the steady picture and does not repeat an event. Application code must not open `/dev/ttyHS1`; the router owns that port. On the board, Python calls `arduino.app_utils.Bridge`. On a computer without that package, the web service still starts and the matrix is left unchanged. That computer path was the one checked here.
+The model returns text only. Display commands are small integers: a mode, a progress count from 0 to 13, eight row masks, and a one-shot event. The matrix view stays on the activity chart. The five-second refresh repeats the steady picture and does not repeat an event. Application code must not open `/dev/ttyHS1`; the router owns that port. On the board, Python calls `arduino.app_utils.Bridge`. On a computer without that package, the web service still starts and the matrix is left unchanged. That computer path was the one checked here.
 
 ## State machine
 
 | State | How it is entered | Timer | Matrix |
 | --- | --- | --- | --- |
-| Proposed | A suggestion is accepted by the validator or the catalog | Not started | Pending column. The plant does not grow |
-| Rejected | The person asks for another suggestion | Not started | Returns to the chart, or the plant if that view is selected |
-| Active | The person accepts | Started and stored | Chart: a progress bar on row 3. Plant: the current plant plus a bar on row 7 |
-| Active, time up | Derived from the stored start time. The stored status stays `active`. The page phase is `awaiting_report` | Held at the deadline | A small done mark. This is not growth and not a kept cell |
-| Kept | The person reports that they kept it, at or after the deadline | Closed | One history cell, and one plant stage. In plant view the sketch plays growth. In chart view it reveals the grid |
-| Not kept | The person reports that they did not, at or after the deadline | Closed | No new cell and no lost growth. A short acknowledgement, then the same plant |
+| Proposed | A suggestion is accepted by the validator or the catalog | Not started | Pending column |
+| Rejected | The person asks for another suggestion | Not started | Returns to the chart, or one idle pixel when the chart is empty |
+| Active | The person accepts | Started and stored | A progress bar on row 3. History cells are not drawn during the timer |
+| Active, time up | Derived from the stored start time. The stored status stays `active`. The page phase is `awaiting_report` | Held at the deadline | A small done mark. This is not a kept cell |
+| Kept | The person reports that they kept it, at or after the deadline | Closed | One history cell, then the chart |
+| Not kept | The person reports that they did not, at or after the deadline | Closed | No new cell. Older cells stay |
 
 Several kept activities in one category on one day still light one cell. Older sessions stay in `data/outmark.json` after they leave the 13-day window.
 
@@ -141,19 +141,17 @@ A kept cell is a self-report, not evidence. Outmark cannot tell whether the repo
 
 ## Matrix animations
 
-The sketch and `python/outmark/frames.py` share six plant silhouettes and the event lengths. Event numbers are startup `1`, proposal `2`, accept `3`, timer expired `4`, kept `5`, not kept `6`, and mode switch `7`. A repeated generation is ignored. A new generation replaces the animation that is playing.
+Event numbers are startup `1`, proposal `2`, accept `3`, timer expired `4`, kept `5`, not kept `6`, and mode switch `7`. A repeated generation is ignored. A new generation replaces the animation that is playing. The Linux app always selects the activity chart.
 
-Frames are 104 values, row by row, 13 columns. Row 0 is the same edge as the walking history row. Plant art leaves row 7 empty so a plant-view timer can fill it. The chart timer uses row 3 and does not draw history cells while it runs. A reveal only lights pixels that belong to the destination frame, so a chart cell cannot appear before the kept session is stored.
+Frames are 104 values, row by row, 13 columns. Row 0 is the same edge as the walking history row. The timer uses row 3 and does not draw history cells while it runs. A reveal only lights pixels that belong to the destination frame, so a chart cell cannot appear before the kept session is stored. Restarting the app sends startup, not another kept event.
 
-A kept report sends event 5 before the new plant stage. The animation starts on the old silhouette and ends on the new one. At stage 5, another kept report plays a one-pixel shimmer and stays on the flower. Restarting the Linux app sends startup, not another growth event. The web drawing and the matrix stage both come from the count of kept sessions.
-
-`pytest` checks these frames, the event order, and that the sketch text contains the same plant rows. That does not light the glass. Playback, the two-integer `set_event` call, and which physical edge is row 0 were not run on a UNO Q.
+`pytest` checks these frames and the event order. That does not light the glass. Playback, the two-integer `set_event` call, and which physical edge is row 0 were not run on a UNO Q.
 
 ## Troubleshooting
 
 - The report buttons stay disabled and the server returns 409 until the selected minutes have elapsed. Wait, or in a test move the fake clock to the deadline.
 - "Saved here. The board has not accepted it." means the preference is in the JSON file and the bridge call failed or the bridge package is absent. The page does not claim the glass changed.
-- A proposal shows the pending column, not the history grid. Rejecting it returns to the chart or the plant.
+- A proposal shows the pending column, not the history grid. Rejecting it returns to the chart.
 - If the matrix stays on the previous picture, the sketch may still be inside an animation. It returns to the latest steady frame when that animation ends. The refresh does not restart a finished growth animation.
 - Do not call a blocking sequence player from `loop()`. New frames should be drawn from stored state when `millis()` crosses a frame boundary.
 
@@ -164,7 +162,7 @@ Known limits, still open until a board is available:
 - Whether a phone can open the App Lab web port, and whether the app container must use `HOST_IP` to reach `llama-server`.
 - Generation latency and memory for the Qwen file.
 - Whether `data/outmark.json` survives an App Lab restart.
-- A real lit cell, plant stage, or animation after a kept report.
+- A real lit cell or animation after a kept report.
 
 ## Demo
 

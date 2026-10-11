@@ -23,9 +23,8 @@ from outmark.frames import (
     EVENT_PROPOSAL,
     EVENT_STARTUP,
     VIEW_CHART,
-    VIEW_PLANT,
 )
-from outmark.plant import plant_state
+from outmark.records import SessionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -163,19 +162,14 @@ def publish(
     display: MatrixDisplay,
     event: tuple[int, int] | None = None,
 ) -> None:
-    """Send the current view. A failure here must not be treated as a session change.
+    """Send the activity chart. A failure here must not be treated as a session change.
 
-    A kept event is sent before the new plant stage so the sketch can animate
-    from the previous silhouette. Refresh calls omit the event.
+    Refresh calls omit the event, so a growth-style replay cannot happen.
+    The matrix stays on the chart.
     """
-    stage = int(plant_state(engine.sessions())["stage"])
-    view = VIEW_PLANT if engine.display_mode() == "plant" else VIEW_CHART
-    if event is not None and event[0] == EVENT_KEPT:
+    if event is not None:
         display.set_event(event[0], event[1])
-    display.set_plant(stage)
-    if event is not None and event[0] != EVENT_KEPT:
-        display.set_event(event[0], event[1])
-    display.set_view(view)
+    display.set_view(VIEW_CHART)
     send(display, describe(engine))
 
 
@@ -228,7 +222,7 @@ class DisplayTracker:
         self._generation = 0
         self._seen = False
         self._phase = "idle"
-        self._stage = 0
+        self._kept = 0
         self._mode = "chart"
 
     def observe(self, engine: SessionEngine) -> tuple[int, int] | None:
@@ -237,8 +231,8 @@ class DisplayTracker:
 
     def _observe(self, engine: SessionEngine) -> tuple[int, int] | None:
         phase = _phase(engine)
-        stage = int(plant_state(engine.sessions())["stage"])
-        mode = engine.display_mode()
+        kept = _kept_count(engine)
+        mode = "chart"
         code: int | None = None
         if not self._seen:
             code = EVENT_STARTUP
@@ -251,15 +245,19 @@ class DisplayTracker:
         elif phase == "awaiting_report" and self._phase == "active":
             code = EVENT_EXPIRED
         elif self._phase == "awaiting_report" and phase == "idle":
-            code = EVENT_KEPT if stage > self._stage else EVENT_NOT_KEPT
+            code = EVENT_KEPT if kept > self._kept else EVENT_NOT_KEPT
         self._seen = True
         self._phase = phase
-        self._stage = stage
+        self._kept = kept
         self._mode = mode
         if code is None:
             return None
         self._generation += 1
         return (code, self._generation)
+
+
+def _kept_count(engine: SessionEngine) -> int:
+    return sum(1 for session in engine.sessions() if session.status is SessionStatus.KEPT)
 
 
 def _phase(engine: SessionEngine) -> str:

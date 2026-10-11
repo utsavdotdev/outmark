@@ -1,5 +1,7 @@
 # Outmark interaction and animation update
 
+Plant growth and the plant/chart switch were removed after this plan. The page is one column: the current promise, then history. The matrix stays on the activity chart.
+
 This plan adapts the working application. It does not replace the session store, the local model adapter, or the paper-and-ink theme.
 
 Baseline before these changes: `main` is 8 commits ahead of `origin/main`. `pytest` collected 54 tests and all passed on Python 3.14.5. No existing failure was recorded. `.DS_Store` is untracked and stays out of commits.

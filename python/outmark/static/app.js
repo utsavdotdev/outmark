@@ -15,11 +15,12 @@ const reflectionNode = document.querySelector("#reflection");
 const gridNode = document.querySelector("#grid");
 const sessionsNode = document.querySelector("#sessions");
 const historyRange = document.querySelector("#history-range");
-const plantLabel = document.querySelector("#plant-label");
-const plantDrawing = document.querySelector("#plant-drawing");
-const matrixNote = document.querySelector("#matrix-note");
+const reportFields = document.querySelector("#report-fields");
 const categoryLabels = new Map(
-  [...document.querySelectorAll("#category option")].map((option) => [option.value, option.textContent]),
+  [...document.querySelectorAll("input[name=category]")].map((input) => [
+    input.value,
+    input.parentElement.textContent.trim(),
+  ]),
 );
 
 const timerState = document.querySelector("#timer-state");
@@ -32,23 +33,20 @@ let proposalId = null;
 let sessionId = null;
 let poll = null;
 let reportOpen = false;
-let plantStage = null;
 
 setup.addEventListener("submit", (event) => {
   event.preventDefault();
   suggest();
 });
+setup.addEventListener("change", (event) => {
+  if (event.target.name === "duration" && !setup.hidden) {
+    previewTimer(chosenMinutes(), "Ready when you are.");
+  }
+});
 document.querySelector("#accept").addEventListener("click", accept);
 document.querySelector("#reject").addEventListener("click", reject);
 document.querySelector("#kept").addEventListener("click", () => report("kept"));
 document.querySelector("#not-kept").addEventListener("click", () => report("not_kept"));
-for (const input of document.querySelectorAll("input[name=matrix]")) {
-  input.addEventListener("change", () => {
-    if (input.checked) {
-      setMatrix(input.value);
-    }
-  });
-}
 
 boot();
 
@@ -72,17 +70,16 @@ async function boot() {
 }
 
 async function suggest() {
-  const duration = document.querySelector("input[name=duration]:checked");
   setBusy(true);
   statusNode.textContent = "Writing a suggestion…";
   try {
     const state = await sendJson("/api/quest", {
-      duration_minutes: Number(duration.value),
-      category: document.querySelector("#category").value,
+      duration_minutes: chosenMinutes(),
+      category: document.querySelector("input[name=category]:checked").value,
     });
     showModel(state.source);
     renderState(state);
-    statusNode.textContent = "One suggestion. Accept it, or reject it and ask again.";
+    statusNode.textContent = "";
   } catch (error) {
     statusNode.textContent = error.message;
   } finally {
@@ -95,7 +92,8 @@ async function accept() {
   try {
     const state = await sendJson("/api/session/start", { proposal_id: proposalId });
     renderState(state);
-    statusNode.textContent = "Your commitment is in progress.";
+    await renderHistory();
+    statusNode.textContent = "";
   } catch (error) {
     statusNode.textContent = error.message;
   } finally {
@@ -136,21 +134,13 @@ async function report(outcome) {
 }
 
 function statusFor(phase) {
-  if (phase === "proposed") {
-    return "One suggestion. Accept it, or reject it and ask again.";
+  if (phase === "idle") {
+    return "Choose a duration and a category.";
   }
-  if (phase === "active") {
-    return "Your commitment is in progress.";
-  }
-  if (phase === "awaiting_report") {
-    return "Time's up. How did it go?";
-  }
-  return "Choose a duration and a category.";
+  return "";
 }
 
 function renderState(state) {
-  showPlant(state.plant);
-  applyDisplay(state);
   if (state.phase === "proposed" && state.proposal) {
     showProposal(state.proposal);
     return;
@@ -167,9 +157,11 @@ function showSetup() {
   proposalId = null;
   sessionId = null;
   reportOpen = false;
+  reportFields.hidden = true;
   setup.hidden = false;
   proposalPanel.hidden = true;
   activePanel.hidden = true;
+  previewTimer(chosenMinutes(), "Ready when you are.");
 }
 
 function showProposal(proposal) {
@@ -183,6 +175,7 @@ function showProposal(proposal) {
   setup.hidden = true;
   proposalPanel.hidden = false;
   activePanel.hidden = true;
+  previewTimer(proposal.duration_minutes, "Starts when you accept.");
 }
 
 function showActive(session) {
@@ -203,6 +196,8 @@ function showActive(session) {
     : "Your commitment is in progress.";
   timerNode.textContent = formatRemaining(session.remaining_seconds);
   paintRing(session);
+  reportFields.hidden = !reportOpen;
+  modelNote.hidden = true;
   lockReports();
   setup.hidden = true;
   proposalPanel.hidden = true;
@@ -215,6 +210,17 @@ function paintRing(session) {
   const ratio = total === 0 ? 0 : elapsed / total;
   ring.style.strokeDasharray = String(ringLength);
   ring.style.strokeDashoffset = String(ringLength * (1 - ratio));
+}
+
+function previewTimer(minutes, label) {
+  timerState.textContent = label;
+  timerNode.textContent = formatRemaining(minutes * 60);
+  paintRing({ duration_minutes: minutes, elapsed_seconds: 0 });
+}
+
+function chosenMinutes() {
+  const checked = document.querySelector("input[name=duration]:checked");
+  return checked ? Number(checked.value) : 10;
 }
 
 function lockReports() {
@@ -238,58 +244,32 @@ function showModel(source) {
   modelNote.textContent = "";
 }
 
-function applyDisplay(state) {
-  if (!state || !state.display_mode) {
-    return;
-  }
-  for (const input of document.querySelectorAll("input[name=matrix]")) {
-    input.checked = input.value === state.display_mode;
-  }
-  matrixNote.textContent = state.display_connected
-    ? "Sent to the board. This page cannot see the glass."
-    : "Saved here. The board has not accepted it.";
-}
-
-async function setMatrix(mode) {
-  setBusy(true);
-  try {
-    const state = await sendJson("/api/display-mode", { display_mode: mode });
-    renderState(state);
-    statusNode.textContent = statusFor(state.phase);
-  } catch (error) {
-    statusNode.textContent = error.message;
-  } finally {
-    setBusy(false);
-  }
-}
-
-function showPlant(plant) {
-  if (!plant) {
-    return;
-  }
-  const next = Number(plant.stage);
-  const grew = plantStage !== null && next > plantStage;
-  plantStage = next;
-  plantLabel.textContent = plant.label;
-  plantDrawing.dataset.stage = String(next);
-  plantDrawing.classList.toggle("grew", grew);
-}
-
 async function renderHistory() {
   const history = await readJson("/api/history");
-  showPlant(history.plant);
-  historyRange.textContent = `${history.start_date} through ${history.end_date}. A filled cell is a kept commitment.`;
+  historyRange.textContent = `${history.start_date} – ${history.end_date} · a filled cell was kept`;
   gridNode.replaceChildren();
+  const corner = document.createElement("span");
+  corner.className = "axis";
+  gridNode.append(corner);
+  for (const day of dayNumbers(history.start_date, 13)) {
+    const tick = document.createElement("span");
+    tick.className = "axis";
+    tick.textContent = day;
+    gridNode.append(tick);
+  }
   for (const row of history.rows) {
     const name = document.createElement("span");
     name.className = "row-label";
     name.textContent = row.label;
     gridNode.append(name);
-    for (const lit of row.cells) {
+    row.cells.forEach((lit, index) => {
       const cell = document.createElement("span");
       cell.className = lit ? "cell lit" : "cell";
+      if (index === row.cells.length - 1) {
+        cell.classList.add("today");
+      }
       gridNode.append(cell);
-    }
+    });
   }
   sessionsNode.replaceChildren();
   if (history.sessions.length === 0) {
@@ -306,33 +286,36 @@ async function renderHistory() {
     if (nextDay !== day) {
       day = nextDay;
       const heading = document.createElement("li");
-      heading.className = "log-day";
+      heading.className = "note-day";
       heading.textContent = day;
       sessionsNode.append(heading);
     }
     const item = document.createElement("li");
-    item.className = "log-entry";
-    const time = document.createElement("span");
-    time.className = "log-time";
-    time.textContent = stamp.slice(11, 16);
-    const title = document.createElement("span");
-    title.className = "log-title";
+    item.className = "note";
+    const meta = document.createElement("p");
+    meta.className = "note-meta";
+    meta.textContent = `${stamp.slice(11, 16)} · ${session.duration_minutes} min · ${labelFor(session.category)} · ${outcomeLabel(session.status)}`;
+    const title = document.createElement("p");
+    title.className = "note-title";
     title.textContent = session.title;
-    const outcome = document.createElement("span");
-    outcome.className = "log-outcome";
-    outcome.textContent = outcomeLabel(session.status);
-    const detail = document.createElement("p");
-    detail.className = "log-detail";
-    detail.textContent = `${session.duration_minutes} min · ${labelFor(session.category)}`;
-    item.append(time, title, outcome, detail);
+    item.append(meta, title);
     if (session.reflection) {
-      const note = document.createElement("p");
-      note.className = "log-note";
-      note.textContent = session.reflection;
-      item.append(note);
+      const learned = document.createElement("p");
+      learned.className = "note-learn";
+      learned.textContent = session.reflection;
+      item.append(learned);
     }
     sessionsNode.append(item);
   }
+}
+
+function dayNumbers(startDate, count) {
+  const [year, month, day] = startDate.split("-").map(Number);
+  const days = [];
+  for (let offset = 0; offset < count; offset += 1) {
+    days.push(new Date(year, month - 1, day + offset).getDate());
+  }
+  return days;
 }
 
 function outcomeLabel(status) {

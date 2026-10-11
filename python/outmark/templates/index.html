@@ -8,67 +8,56 @@
   </head>
   <body>
     <main id="app">
-      <header class="mast">
-        <p class="mark">8 × 13</p>
-        <div>
-          <h1>Outmark</h1>
-          <p class="tagline">Make a promise. Step away. Leave a mark.</p>
-        </div>
+      <header class="top">
+        <h1>Outmark</h1>
+        <p class="tagline">Make a promise. Step away. Leave a mark.</p>
       </header>
-      <p id="status" role="status">Checking the local service…</p>
-      <p id="model-note" hidden></p>
 
-      <div class="split">
-        <section id="session" aria-label="Commitment">
+      <section class="stage" aria-label="Commitment">
+        <div class="panel" id="promise">
+          <p id="status" role="status">Checking the local service…</p>
+          <p id="model-note" hidden></p>
+
           <form id="setup">
-            <h2>A new promise</h2>
-            <fieldset>
+            <fieldset class="choices">
               <legend>Minutes</legend>
               <label><input type="radio" name="duration" value="5"> 5</label>
               <label><input type="radio" name="duration" value="10" checked> 10</label>
               <label><input type="radio" name="duration" value="15"> 15</label>
             </fieldset>
-            <label class="field" for="category">Category</label>
-            <select id="category" name="category">
-              <option value="walking">Walking and movement</option>
-              <option value="nature_observation">Nature observation</option>
-              <option value="quiet_outdoor">Quiet outdoor time</option>
-              <option value="social">Social connection</option>
-              <option value="outdoor_care">Outdoor care or helping</option>
-              <option value="exploring">Exploring a new place</option>
-              <option value="creative_observation">Creative observation</option>
-              <option value="other">Other offline experiences</option>
-            </select>
+            <fieldset class="choices categories">
+              <legend>Category</legend>
+              <label><input type="radio" name="category" value="walking" checked> Walking and movement</label>
+              <label><input type="radio" name="category" value="nature_observation"> Nature observation</label>
+              <label><input type="radio" name="category" value="quiet_outdoor"> Quiet outdoor time</label>
+              <label><input type="radio" name="category" value="social"> Social connection</label>
+              <label><input type="radio" name="category" value="outdoor_care"> Outdoor care or helping</label>
+              <label><input type="radio" name="category" value="exploring"> Exploring a new place</label>
+              <label><input type="radio" name="category" value="creative_observation"> Creative observation</label>
+              <label><input type="radio" name="category" value="other"> Other offline experiences</label>
+            </fieldset>
             <button type="submit" class="primary">Suggest an activity</button>
           </form>
 
           <section id="proposal" hidden>
             <p class="eyebrow">One suggestion</p>
             <h2 id="proposal-title"></h2>
-            <p id="proposal-instructions"></p>
+            <p id="proposal-instructions" class="lead"></p>
             <p id="proposal-meta" class="meta"></p>
-            <p id="proposal-question"></p>
+            <p id="proposal-question" class="question"></p>
             <div class="actions">
               <button type="button" id="accept" class="primary">Accept and start</button>
               <button type="button" id="reject">Another suggestion</button>
             </div>
           </section>
 
-          <section id="active" class="timer-panel" hidden>
-            <p id="timer-state" class="eyebrow">Your commitment is in progress.</p>
-            <div class="timer-face">
-              <svg viewBox="0 0 120 120" aria-hidden="true">
-                <circle class="ring-track" cx="60" cy="60" r="52"></circle>
-                <circle id="ring" class="ring-value" cx="60" cy="60" r="52"></circle>
-              </svg>
-              <p id="timer" class="timer">0:00</p>
-            </div>
+          <section id="active" hidden>
+            <p class="eyebrow">Your promise</p>
             <h2 id="active-title"></h2>
-            <p id="active-quest"></p>
+            <p id="active-quest" class="lead"></p>
             <p id="active-meta" class="meta"></p>
-            <p id="active-question"></p>
-            <p id="board-note" class="meta">The board draws this timer when the bridge is connected. This page cannot confirm the glass.</p>
-            <div id="report-fields">
+            <div id="report-fields" hidden>
+              <p id="active-question" class="question"></p>
               <label class="field" for="reflection">Reflection, if you want one</label>
               <textarea id="reflection" maxlength="280" rows="3"></textarea>
               <div class="actions">
@@ -77,63 +66,34 @@
               </div>
             </div>
           </section>
-        </section>
-
-        <div class="side">
-          <section id="plant" aria-label="Plant">
-            <h2>Plant</h2>
-            <p id="plant-label" class="meta">Seed</p>
-            <fieldset class="matrix-choice">
-              <legend>Matrix</legend>
-              <label><input type="radio" name="matrix" value="plant"> Plant growth</label>
-              <label><input type="radio" name="matrix" value="chart" checked> Activity chart</label>
-            </fieldset>
-            <p id="matrix-note" class="meta"></p>
-            <svg id="plant-drawing" viewBox="0 0 120 168" data-stage="0" aria-hidden="true">
-              <line class="ground" x1="16" y1="148" x2="104" y2="148"></line>
-              <g data-stage="0">
-                <ellipse cx="60" cy="136" rx="9" ry="6"></ellipse>
-              </g>
-              <g data-stage="1">
-                <path d="M51 136c0-8 18-8 18 0 0 6-18 6-18 0z"></path>
-                <path d="M60 128c2 4 1 8 0 16"></path>
-              </g>
-              <g data-stage="2">
-                <ellipse cx="60" cy="144" rx="7" ry="4"></ellipse>
-                <path d="M60 148V118"></path>
-                <path d="M60 118c8-6 14-2 12 4"></path>
-              </g>
-              <g data-stage="3">
-                <path d="M60 148V100"></path>
-                <path d="M60 118c-16-2-22-14-14-18"></path>
-                <path d="M60 112c16-2 22-14 14-18"></path>
-              </g>
-              <g data-stage="4">
-                <path d="M60 148V78"></path>
-                <path d="M60 110c-18 0-26-16-16-22"></path>
-                <path d="M60 100c18 0 26-16 16-22"></path>
-                <path d="M60 86c-12 2-16-8-8-12"></path>
-                <circle cx="60" cy="74" r="3"></circle>
-              </g>
-              <g data-stage="5">
-                <path d="M60 148V70"></path>
-                <path d="M60 112c-20 2-28-14-16-22"></path>
-                <path d="M60 100c20 2 28-14 16-22"></path>
-                <path d="M60 84c-14 2-18-10-8-14"></path>
-                <path d="M60 78c14 2 18-10 8-14"></path>
-                <circle cx="60" cy="58" r="8"></circle>
-                <circle cx="60" cy="58" r="3"></circle>
-              </g>
-            </svg>
-          </section>
-          <section id="history">
-            <h2>History</h2>
-            <p id="history-range" class="meta"></p>
-            <div id="grid" class="grid"></div>
-            <ul id="sessions"></ul>
-          </section>
         </div>
-      </div>
+
+        <div class="panel clock" id="timer-slot">
+          <div class="timer-face">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+              <circle id="ring" class="ring-value" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <p id="timer" class="timer">10:00</p>
+          </div>
+          <p id="timer-state">Ready when you are.</p>
+        </div>
+      </section>
+
+      <section id="board" class="panel">
+        <div class="panel-head">
+          <h2>Board</h2>
+          <p id="history-range" class="meta"></p>
+        </div>
+        <div class="grid-scroll">
+          <div id="grid" class="grid"></div>
+        </div>
+      </section>
+
+      <details id="history" class="panel">
+        <summary>Past activity</summary>
+        <ul id="sessions"></ul>
+      </details>
     </main>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
