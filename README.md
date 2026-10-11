@@ -6,7 +6,7 @@ The Linux side of the board owns sessions, the timer, history, and activity text
 
 This repository has been run on a development computer. It has not been run on a UNO Q. Sections below say which steps were checked here and which are still board steps.
 
-The product spec is [docs.md](docs.md). The implementation record is [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md).
+The product spec is [docs.md](docs.md). The implementation record is [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md). The later interaction and animation plan is [docs/OUTMARK_UPDATE_PLAN.md](docs/OUTMARK_UPDATE_PLAN.md).
 
 ## Run on a computer
 
@@ -39,12 +39,16 @@ Stop the server with Ctrl-C. On macOS, ports 5000 and 7000 are often taken by Ai
 
 ## Webpage
 
-The page is the only input. It asks for 5, 10, or 15 minutes and one of eight categories, then shows one suggestion.
+The page is the only input. It asks for 5, 10, or 15 minutes and one of eight categories, then shows one suggestion. The type and colors are unchanged: Iowan Old Style for the title, a system sans for the controls, ink `#1a1814`, paper `#f3efe6`, and rule `#2f5f8a`.
 
-- **Another suggestion** rejects that proposal. Nothing is timed.
-- **Accept and start** is the only action that starts the timer. The timer keeps going if the browser closes.
-- When the time is up, the session stays active until the person chooses **I kept it** or **I did not keep it**. Expiry does not count as kept.
-- A reflection is optional. Only a kept report lights a history cell. A not-kept report is stored and does not clear older cells.
+- **Another suggestion** rejects that proposal. Nothing is timed, and the plant does not grow.
+- **Accept and start** is the only action that starts the timer. The countdown is a ring driven by the server's remaining time. The timer keeps going if the browser closes.
+- **I kept it** and **I did not keep it** stay disabled until the full duration has elapsed. The server rejects an earlier report with HTTP 409 and the remaining time. Expiry does not choose either outcome.
+- After the deadline the status reads "Time's up. How did it go?" A reflection is optional.
+- Only a kept report lights a history cell and advances the plant. A not-kept report is stored, does not clear older cells, and does not remove growth.
+- The plant stage is the number of kept sessions, capped at five: seed, split seed, sprout, two leaves, growing plant, flowering plant. It is computed from the file, so a restart cannot award it twice.
+- **Matrix** chooses Plant growth or Activity chart. The choice is stored in `data/outmark.json`. Older files without that field stay on the chart. If the board does not accept the update, the page says so and keeps the saved choice.
+- History is grouped by day. Each entry shows the time, title, duration, category, outcome, and reflection when there is one.
 - If no model file is installed, or the local model does not answer, the page says so and uses a built-in catalog. That catalog path was used in the browser check on this computer.
 
 ## Architecture
@@ -59,18 +63,18 @@ browser  ->  Flask on the Linux MPU  ->  session engine and data/outmark.json
                                     STM32 sketch draws the matrix
 ```
 
-The model returns text only. Display commands are small integers: a mode, a progress count from 0 to 13, and eight row masks. Application code must not open `/dev/ttyHS1`; the router owns that port. On the board, Python calls `arduino.app_utils.Bridge`. On a computer without that package, the web service still starts and the matrix is left unchanged. That computer path was the one checked here.
+The model returns text only. Display commands are small integers: a mode, a progress count from 0 to 13, eight row masks, a view (`0` chart, `1` plant), a plant stage, and a one-shot event. The five-second refresh repeats the steady picture and does not repeat an event. Application code must not open `/dev/ttyHS1`; the router owns that port. On the board, Python calls `arduino.app_utils.Bridge`. On a computer without that package, the web service still starts and the matrix is left unchanged. That computer path was the one checked here.
 
 ## State machine
 
 | State | How it is entered | Timer | Matrix |
 | --- | --- | --- | --- |
-| Proposed | A suggestion is accepted by the validator or the catalog | Not started | Stays idle, or on the history grid if a cell is already lit |
-| Rejected | The person asks for another suggestion | Not started | Unchanged |
-| Active | The person accepts | Started and stored | A center column, then a progress bar |
-| Active, time up | Derived from the stored start time. The status is not rewritten | Held at the deadline for display | A small done mark. This is not a kept cell |
-| Kept | The person reports that they kept it | Closed | History grid. One cell for that category and local day |
-| Not kept | The person reports that they did not | Closed | History grid, with no new cell |
+| Proposed | A suggestion is accepted by the validator or the catalog | Not started | Pending column. The plant does not grow |
+| Rejected | The person asks for another suggestion | Not started | Returns to the chart, or the plant if that view is selected |
+| Active | The person accepts | Started and stored | Chart: a progress bar on row 3. Plant: the current plant plus a bar on row 7 |
+| Active, time up | Derived from the stored start time. The stored status stays `active`. The page phase is `awaiting_report` | Held at the deadline | A small done mark. This is not growth and not a kept cell |
+| Kept | The person reports that they kept it, at or after the deadline | Closed | One history cell, and one plant stage. In plant view the sketch plays growth. In chart view it reveals the grid |
+| Not kept | The person reports that they did not, at or after the deadline | Closed | No new cell and no lost growth. A short acknowledgement, then the same plant |
 
 Several kept activities in one category on one day still light one cell. Older sessions stay in `data/outmark.json` after they leave the 13-day window.
 
@@ -82,7 +86,7 @@ Matrix rows, from the first frame row: walking, nature observation, quiet outdoo
 
 1. Open this repository in Arduino App Lab as an app. The entry points are `python/main.py`, `app.yaml`, `sketch/sketch.ino`, and `sketch/sketch.yaml`.
 2. `sketch/sketch.yaml` pins `Arduino_RouterBridge` 0.3.0 and the libraries from Arduino's led-matrix-painter example. Those versions were not resolved on this machine. `Arduino_LED_Matrix` is expected from the UNO Q core, not from that file.
-3. Run the app. The sketch exposes `set_mode`, `set_progress`, and `set_grid_row` with `Bridge.provide_safe`. `loop()` redraws when the state changes and does not wait for the timer.
+3. Run the app. The sketch exposes `set_mode`, `set_progress`, `set_grid_row`, `set_view`, `set_plant`, and `set_event` with `Bridge.provide_safe`. `loop()` advances animations with `millis()` and `matrix.draw`. It does not wait on the commitment timer.
 4. From a phone or computer on the same network, open the published web port. `app.yaml` lists port 8765. Reachability from another device was not checked. Whether an App Lab container can see the host's `127.0.0.1` was not checked.
 
 The onboard control is a power button. The UNO Q manual says a press of about five seconds reboots Linux. It does not document a short press that an application can handle. This was read from the manual, not from a press on this board. Do not bind accept, reject, or report to that button. Use the webpage.
@@ -135,13 +139,32 @@ Sessions and reflections stay in `data/outmark.json` on the device. There are no
 
 A kept cell is a self-report, not evidence. Outmark cannot tell whether the report is honest, and it does not punish a missed commitment.
 
+## Matrix animations
+
+The sketch and `python/outmark/frames.py` share six plant silhouettes and the event lengths. Event numbers are startup `1`, proposal `2`, accept `3`, timer expired `4`, kept `5`, not kept `6`, and mode switch `7`. A repeated generation is ignored. A new generation replaces the animation that is playing.
+
+Frames are 104 values, row by row, 13 columns. Row 0 is the same edge as the walking history row. Plant art leaves row 7 empty so a plant-view timer can fill it. The chart timer uses row 3 and does not draw history cells while it runs. A reveal only lights pixels that belong to the destination frame, so a chart cell cannot appear before the kept session is stored.
+
+A kept report sends event 5 before the new plant stage. The animation starts on the old silhouette and ends on the new one. At stage 5, another kept report plays a one-pixel shimmer and stays on the flower. Restarting the Linux app sends startup, not another growth event. The web drawing and the matrix stage both come from the count of kept sessions.
+
+`pytest` checks these frames, the event order, and that the sketch text contains the same plant rows. That does not light the glass. Playback, the two-integer `set_event` call, and which physical edge is row 0 were not run on a UNO Q.
+
+## Troubleshooting
+
+- The report buttons stay disabled and the server returns 409 until the selected minutes have elapsed. Wait, or in a test move the fake clock to the deadline.
+- "Saved here. The board has not accepted it." means the preference is in the JSON file and the bridge call failed or the bridge package is absent. The page does not claim the glass changed.
+- A proposal shows the pending column, not the history grid. Rejecting it returns to the chart or the plant.
+- If the matrix stays on the previous picture, the sketch may still be inside an animation. It returns to the latest steady frame when that animation ends. The refresh does not restart a finished growth animation.
+- Do not call a blocking sequence player from `loop()`. New frames should be drawn from stored state when `millis()` crosses a frame boundary.
+
 Known limits, still open until a board is available:
 
 - Which glass edge is row 0, and whether Bridge integer masks arrive as 0 through 8191.
+- Whether `set_event(code, generation)` accepts two integers through the router.
 - Whether a phone can open the App Lab web port, and whether the app container must use `HOST_IP` to reach `llama-server`.
 - Generation latency and memory for the Qwen file.
 - Whether `data/outmark.json` survives an App Lab restart.
-- A real lit cell after a kept report.
+- A real lit cell, plant stage, or animation after a kept report.
 
 ## Demo
 
@@ -154,7 +177,7 @@ The product is done when these steps happen on a UNO Q. The right-hand column is
 | 3. Reject it and ask for another | Webpage | Done in the browser. No timer started. |
 | 4. Accept one | Webpage | Done. The timer counted down. |
 | 5. Close the browser | Timer keeps going | A new process restored an active session from the file, including after the deadline, and did not mark it kept. A browser was not closed mid-timer. |
-| 6. Report kept or not kept | Webpage, after returning | Done. Both reports were used. Expiry did not report by itself. |
+| 6. Report kept or not kept | Webpage, after the duration | Done in tests, including a report one second early that was refused. The browser check confirmed the buttons stay disabled before the deadline. Expiry did not report by itself. |
 | 7. History file still has the session | `data/outmark.json` | Tests read the file back. The page showed the reflection after reload. |
 | 8. The matching matrix cell changes | Only for a kept report | An in-memory display selected the history grid. No LED was seen. |
 | 9. Restart and the records remain | Stop and start the App Lab app | A second process read the same file. An App Lab restart was not done. |
@@ -167,8 +190,9 @@ app.yaml                  App Lab manifest
 python/main.py            Linux entry point
 python/outmark/           Importable application package
 python/requirements.txt   Board dependencies
-sketch/sketch.ino         LED matrix modes, drawn on the STM32
+sketch/sketch.ino         Non-blocking matrix animations on the STM32
 sketch/sketch.yaml        RouterBridge libraries for the sketch
 tests/                    Automated checks that do not need the board
-docs/BUILD_PLAN.md        What each stage checked, and what is still open
+docs/BUILD_PLAN.md        What each build stage checked, and what is still open
+docs/OUTMARK_UPDATE_PLAN.md  Timer, plant, and animation plan
 ```

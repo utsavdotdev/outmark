@@ -41,6 +41,20 @@ def test_home_page_offers_the_commitment_flow(tmp_path: Path) -> None:
     assert "The local service did not respond." in script
 
 
+def test_the_page_keeps_the_theme_and_the_timer_copy(tmp_path: Path) -> None:
+    client = create_app(_settings(tmp_path)).test_client()
+    css = client.get("/static/style.css").get_data(as_text=True)
+    script = client.get("/static/app.js").get_data(as_text=True)
+
+    assert "--ink: #1a1814" in css
+    assert "--paper: #f3efe6" in css
+    assert "Iowan Old Style" in css
+    assert "prefers-reduced-motion" in css
+    assert "Your commitment is in progress." in script
+    assert "Time's up. How did it go?" in script
+    assert "Saved here. The board has not accepted it." in script
+
+
 def test_quest_shows_one_proposal_and_leaves_the_matrix_idle(tmp_path: Path) -> None:
     display = RecordingDisplay()
     source = _Source([_draft()])
