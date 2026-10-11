@@ -79,3 +79,4 @@ Each stage is one commit, in order, after `ruff` and `pytest`. Nothing is pushed
 - Stage 2: the page uses the same type and colors, with a dedicated countdown ring. Report buttons stay disabled until `awaiting_report`.
 - Stage 3: history entries are grouped by day and show time, duration, category, outcome, and an optional reflection. An expired timer stays on the countdown instead of returning to the setup form.
 - Stage 4: plant stage is `min(5, kept sessions)`, returned on the session and history payloads. The page draws that stage. Reject, expiry, `not_kept`, an early report, and a duplicate report do not advance it. 63 tests passed.
+- Stage 5: `frames.py` and the sketch share plant rows and event lengths. The sketch advances with `millis()` and `matrix.draw`. Playback on the physical glass was not run.
