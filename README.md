@@ -21,10 +21,10 @@ python -m ruff check python tests
 python -m ruff format --check python tests
 ```
 
-`app.yaml` publishes port 8080. That port was already taken here, so the service was started with:
+`app.yaml` publishes port 8765. Port 8080 was already taken on this machine, so the app listens on 8765 instead. Start it with:
 
 ```bash
-OUTMARK_HOST=127.0.0.1 OUTMARK_PORT=8765 python python/main.py
+OUTMARK_HOST=127.0.0.1 python python/main.py
 ```
 
 Opening `http://127.0.0.1:8765/` loaded the page. `GET /health` with no model file responded with:
@@ -83,7 +83,7 @@ Matrix rows, from the first frame row: walking, nature observation, quiet outdoo
 1. Open this repository in Arduino App Lab as an app. The entry points are `python/main.py`, `app.yaml`, `sketch/sketch.ino`, and `sketch/sketch.yaml`.
 2. `sketch/sketch.yaml` pins `Arduino_RouterBridge` 0.3.0 and the libraries from Arduino's led-matrix-painter example. Those versions were not resolved on this machine. `Arduino_LED_Matrix` is expected from the UNO Q core, not from that file.
 3. Run the app. The sketch exposes `set_mode`, `set_progress`, and `set_grid_row` with `Bridge.provide_safe`. `loop()` redraws when the state changes and does not wait for the timer.
-4. From a phone or computer on the same network, open the published web port. `app.yaml` lists port 8080. Reachability from another device was not checked. Whether an App Lab container can see the host's `127.0.0.1` was not checked.
+4. From a phone or computer on the same network, open the published web port. `app.yaml` lists port 8765. Reachability from another device was not checked. Whether an App Lab container can see the host's `127.0.0.1` was not checked.
 
 The onboard control is a power button. The UNO Q manual says a press of about five seconds reboots Linux. It does not document a short press that an application can handle. This was read from the manual, not from a press on this board. Do not bind accept, reject, or report to that button. Use the webpage.
 
@@ -119,7 +119,7 @@ The process reads environment variables. See `.env.example`. Outmark does not lo
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OUTMARK_HOST` | `0.0.0.0` | Address the web server binds |
-| `OUTMARK_PORT` | `8080` | Port published in `app.yaml` |
+| `OUTMARK_PORT` | `8765` | Port published in `app.yaml` |
 | `OUTMARK_DATA_DIR` | `<app>/data` | Persistent JSON storage. App Lab reserves this folder. |
 | `OUTMARK_MODEL_DIR` | `<app>/models` | Directory scanned for a `.gguf` file |
 | `OUTMARK_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |

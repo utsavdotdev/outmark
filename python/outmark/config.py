@@ -30,7 +30,7 @@ def load_settings() -> Settings:
     model_dir = _optional_path("OUTMARK_MODEL_DIR", APP_ROOT / "models")
     return Settings(
         host=os.environ.get("OUTMARK_HOST", "0.0.0.0").strip() or "0.0.0.0",
-        port=_port(os.environ.get("OUTMARK_PORT", "8080")),
+        port=_port(os.environ.get("OUTMARK_PORT", "8765")),
         data_dir=data_dir,
         model_dir=model_dir,
         log_level=_log_level(os.environ.get("OUTMARK_LOG_LEVEL", "INFO")),
