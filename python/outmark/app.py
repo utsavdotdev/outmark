@@ -10,7 +10,7 @@ from flask import Flask, jsonify, render_template
 
 from outmark.clock import Clock, SystemClock
 from outmark.config import Settings, load_settings, model_is_present
-from outmark.display import MatrixDisplay, publish
+from outmark.display import DisplayTracker, MatrixDisplay, publish
 from outmark.engine import SessionEngine
 from outmark.generator import ActivitySource, source_from_settings
 from outmark.storage import STORE_FILENAME, JsonStore
@@ -38,6 +38,8 @@ def create_app(
     )
     app.config["OUTMARK_SETTINGS"] = resolved
     app.config["OUTMARK_DISPLAY"] = display
+    app.config["OUTMARK_DISPLAY_OK"] = False
+    app.config["OUTMARK_DISPLAY_TRACKER"] = DisplayTracker()
     app.config["OUTMARK_ENGINE"] = _open_engine(resolved, clock or SystemClock())
     app.config["OUTMARK_ACTIVITY_SOURCE"] = source or source_from_settings(
         resolved.llm_url,
@@ -84,7 +86,11 @@ def _open_engine(settings: Settings, clock: Clock) -> SessionEngine | None:
 
 def _publish_startup(app: Flask) -> None:
     """Push the stored grid once. A bridge failure leaves the JSON file alone."""
+    engine = app.config["OUTMARK_ENGINE"]
     try:
-        publish(app.config["OUTMARK_ENGINE"], app.config["OUTMARK_DISPLAY"])
+        event = app.config["OUTMARK_DISPLAY_TRACKER"].observe(engine)
+        publish(engine, app.config["OUTMARK_DISPLAY"], event)
     except Exception:
         logger.exception("Matrix startup skipped. Stored sessions were left unchanged.")
+        return
+    app.config["OUTMARK_DISPLAY_OK"] = True

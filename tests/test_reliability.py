@@ -9,7 +9,7 @@ from pathlib import Path
 from outmark.app import create_app
 from outmark.clock import FakeClock
 from outmark.config import Settings
-from outmark.display import MODE_DONE, MODE_GRID, MODE_REST, RecordingDisplay
+from outmark.display import MODE_DONE, MODE_GRID, MODE_PENDING, MODE_REST, RecordingDisplay
 from outmark.generator import LlamaServerSource
 from outmark.records import SessionStatus
 from outmark.storage import JsonStore
@@ -32,7 +32,7 @@ def test_inference_failure_uses_the_catalog_and_reject_starts_no_timer(tmp_path:
     assert suggested.get_json()["source"] == "fallback"
     assert suggested.get_json()["proposal"]["title"] == "Walk a familiar block"
     assert suggested.get_json()["session"] is None
-    assert _mode(display) == MODE_REST
+    assert _mode(display) == MODE_PENDING
     proposal_id = suggested.get_json()["proposal"]["id"]
 
     rejected = client.post("/api/proposal/reject", json={"id": proposal_id})
@@ -224,4 +224,13 @@ class _BrokenDisplay:
         raise RuntimeError("bridge down")
 
     def set_grid_row(self, row: int, mask: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_view(self, view: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_plant(self, stage: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_event(self, code: int, generation: int) -> None:
         raise RuntimeError("bridge down")

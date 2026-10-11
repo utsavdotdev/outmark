@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from outmark.display import (
     MODE_REST,
     PROGRESS_ROW,
     BridgeDisplay,
+    DisplayTracker,
     DisplayView,
     RecordingDisplay,
     publish,
@@ -26,6 +28,7 @@ from outmark.display import (
 )
 from outmark.engine import SessionEngine
 from outmark.errors import DisplayError
+from outmark.frames import EVENT_KEPT, EVENT_MODE, EVENT_NOT_KEPT, EVENT_STARTUP, VIEW_PLANT
 from outmark.records import ActivityDraft, CompletionReport, SessionStatus
 from outmark.storage import JsonStore
 
@@ -158,6 +161,102 @@ def test_a_corrupt_history_file_does_not_stop_the_web_server(tmp_path: Path) -> 
     assert app.config["OUTMARK_ENGINE"] is None
 
 
+def test_display_mode_is_saved_and_restored(tmp_path: Path) -> None:
+    display = RecordingDisplay()
+    app = create_app(_settings(tmp_path), display=display, clock=FakeClock(START))
+    client = app.test_client()
+    page = client.get("/").get_data(as_text=True)
+    assert "Plant growth" in page
+    assert "Activity chart" in page
+
+    refused = client.post("/api/display-mode", json={"display_mode": "both"})
+    chosen = client.post("/api/display-mode", json={"display_mode": "plant"})
+
+    assert refused.status_code == 400
+    assert chosen.status_code == 200
+    assert chosen.get_json()["display_mode"] == "plant"
+    assert chosen.get_json()["display_connected"] is True
+    assert ("set_view", VIEW_PLANT) in display.calls
+    assert any(call[1] == EVENT_MODE for call in display.calls if call[0] == "set_event")
+
+    restored = RecordingDisplay()
+    create_app(_settings(tmp_path), display=restored, clock=FakeClock(START))
+    assert ("set_view", VIEW_PLANT) in restored.calls
+    assert any(call[1] == EVENT_STARTUP for call in restored.calls if call[0] == "set_event")
+    assert not any(call[1] == EVENT_KEPT for call in restored.calls if call[0] == "set_event")
+
+
+def test_kept_growth_is_sent_once_and_a_restart_does_not_repeat_it(tmp_path: Path) -> None:
+    engine, clock, path = _engine(tmp_path)
+    tracker = DisplayTracker()
+    display = RecordingDisplay()
+    publish(engine, display, tracker.observe(engine))
+    proposal = engine.propose(_draft())
+    tracker.observe(engine)
+    session = engine.accept(proposal.id)
+    tracker.observe(engine)
+    clock.advance(session.duration_minutes * 60)
+    tracker.observe(engine)
+    engine.report(session.id, CompletionReport("kept", None))
+    event = tracker.observe(engine)
+    display.calls.clear()
+    publish(engine, display, event)
+
+    assert event is not None
+    assert event[0] == EVENT_KEPT
+    assert display.calls[0] == ("set_event", EVENT_KEPT, event[1])
+    assert display.calls[1] == ("set_plant", 1)
+    assert tracker.observe(engine) is None
+
+    restarted = RecordingDisplay()
+    restarted_tracker = DisplayTracker()
+    restarted_engine = SessionEngine(JsonStore(path), FakeClock(clock.wall()))
+    publish(restarted_engine, restarted, restarted_tracker.observe(restarted_engine))
+    assert ("set_plant", 1) in restarted.calls
+    assert [call[1] for call in restarted.calls if call[0] == "set_event"] == [EVENT_STARTUP]
+    assert restarted_tracker.observe(restarted_engine) is None
+
+
+def test_not_kept_does_not_send_growth(tmp_path: Path) -> None:
+    engine, clock, _path = _engine(tmp_path)
+    tracker = DisplayTracker()
+    tracker.observe(engine)
+    proposal = engine.propose(_draft())
+    tracker.observe(engine)
+    session = engine.accept(proposal.id)
+    tracker.observe(engine)
+    clock.advance(session.duration_minutes * 60)
+    tracker.observe(engine)
+    engine.report(session.id, CompletionReport("not_kept", None))
+    event = tracker.observe(engine)
+    display = RecordingDisplay()
+    publish(engine, display, event)
+
+    assert event is not None
+    assert event[0] == EVENT_NOT_KEPT
+    assert ("set_plant", 0) in display.calls
+    assert not any(call[1] == EVENT_KEPT for call in display.calls if call[0] == "set_event")
+
+
+def test_an_older_file_without_display_mode_opens_on_the_chart(tmp_path: Path) -> None:
+    path = tmp_path / "outmark.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "settings": {"default_duration": 10},
+                "proposals": [],
+                "sessions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    engine = SessionEngine(JsonStore(path), FakeClock(START))
+
+    assert engine.display_mode() == "chart"
+
+
 def test_bridge_display_imports_only_when_the_runtime_exists() -> None:
     try:
         import arduino.app_utils  # noqa: F401
@@ -226,4 +325,13 @@ class _BrokenDisplay:
         raise RuntimeError("bridge down")
 
     def set_grid_row(self, row: int, mask: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_view(self, view: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_plant(self, stage: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_event(self, code: int, generation: int) -> None:
         raise RuntimeError("bridge down")

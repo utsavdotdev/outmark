@@ -58,13 +58,7 @@ class SessionEngine:
             ),
             status=ProposalStatus.PROPOSED,
         )
-        self._commit(
-            Document(
-                default_duration=self._document.default_duration,
-                proposals=(*self._document.proposals, proposal),
-                sessions=self._document.sessions,
-            )
-        )
+        self._commit(self._replace(proposals=(*self._document.proposals, proposal)))
         return proposal
 
     def reject(self, proposal_id: str) -> Proposal:
@@ -98,8 +92,7 @@ class SessionEngine:
             reported_at=None,
         )
         self._commit(
-            Document(
-                default_duration=self._document.default_duration,
+            self._replace(
                 proposals=tuple(
                     _replace_status(item, ProposalStatus.ACCEPTED)
                     if item.id == proposal.id
@@ -166,6 +159,17 @@ class SessionEngine:
             progress_segments=min(_PROGRESS_SEGMENTS, int(ratio * _PROGRESS_SEGMENTS)),
         )
 
+    def display_mode(self) -> str:
+        return self._document.display_mode
+
+    def set_display_mode(self, mode: str) -> str:
+        """Store which picture the matrix should hold. This does not change sessions."""
+        if mode not in ("chart", "plant"):
+            raise ValidationError("display_mode must be chart or plant")
+        if mode != self._document.display_mode:
+            self._commit(self._replace(display_mode=mode))
+        return mode
+
     def sessions(self) -> tuple[Session, ...]:
         return self._document.sessions
 
@@ -203,21 +207,31 @@ class SessionEngine:
         raise TransitionError("session was not found")
 
     def _with_proposal(self, proposal: Proposal) -> Document:
-        return Document(
-            default_duration=self._document.default_duration,
+        return self._replace(
             proposals=tuple(
                 proposal if item.id == proposal.id else item for item in self._document.proposals
-            ),
-            sessions=self._document.sessions,
+            )
         )
 
     def _with_session(self, session: Session) -> Document:
-        return Document(
-            default_duration=self._document.default_duration,
-            proposals=self._document.proposals,
+        return self._replace(
             sessions=tuple(
                 session if item.id == session.id else item for item in self._document.sessions
-            ),
+            )
+        )
+
+    def _replace(
+        self,
+        *,
+        proposals: tuple[Proposal, ...] | None = None,
+        sessions: tuple[Session, ...] | None = None,
+        display_mode: str | None = None,
+    ) -> Document:
+        return Document(
+            default_duration=self._document.default_duration,
+            proposals=self._document.proposals if proposals is None else proposals,
+            sessions=self._document.sessions if sessions is None else sessions,
+            display_mode=self._document.display_mode if display_mode is None else display_mode,
         )
 
     def _commit(self, document: Document) -> None:

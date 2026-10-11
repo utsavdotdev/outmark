@@ -80,6 +80,17 @@ def register(app: Flask) -> None:
     def history():
         return _respond(app, lambda engine: _history(engine))
 
+    @app.post("/api/display-mode")
+    def display_mode():
+        def action(engine: SessionEngine) -> dict[str, Any]:
+            mode = _object_body().get("display_mode")
+            if mode not in ("chart", "plant"):
+                raise ValidationError("display_mode must be chart or plant")
+            engine.set_display_mode(mode)
+            return _view(app, engine)
+
+        return _respond(app, action)
+
 
 def _respond(app: Flask, action: Any) -> Any:
     try:
@@ -119,11 +130,16 @@ def _sync_display(app: Flask) -> None:
     display = app.config["OUTMARK_DISPLAY"]
     engine = app.config["OUTMARK_ENGINE"]
     if display is None or not isinstance(engine, SessionEngine):
+        app.config["OUTMARK_DISPLAY_OK"] = False
         return
     try:
-        publish(engine, display)
+        event = app.config["OUTMARK_DISPLAY_TRACKER"].observe(engine)
+        publish(engine, display, event)
     except Exception:
+        app.config["OUTMARK_DISPLAY_OK"] = False
         logger.exception("Matrix update failed. Stored sessions were left unchanged.")
+        return
+    app.config["OUTMARK_DISPLAY_OK"] = True
 
 
 def _view(app: Flask, engine: SessionEngine) -> dict[str, Any]:
@@ -142,6 +158,8 @@ def _view(app: Flask, engine: SessionEngine) -> dict[str, Any]:
         "proposal": None if proposal is None else proposal.to_dict(),
         "session": None if snapshot is None else _snapshot(snapshot),
         "plant": plant_state(engine.sessions()),
+        "display_mode": engine.display_mode(),
+        "display_connected": bool(app.config.get("OUTMARK_DISPLAY_OK")),
     }
 
 

@@ -57,7 +57,7 @@ def test_quest_shows_one_proposal_and_leaves_the_matrix_idle(tmp_path: Path) -> 
     assert body["proposal"]["duration_minutes"] == 10
     assert body["session"] is None
     assert len(source.calls) == 1
-    assert _mode(display) == MODE_REST
+    assert _mode(display) == MODE_PENDING
     assert client.get("/api/session").get_json()["phase"] == "proposed"
 
 
@@ -71,7 +71,7 @@ def test_a_second_quest_is_refused_until_the_first_is_rejected(tmp_path: Path) -
 
     assert refused.status_code == 409
     assert len(source.calls) == 1
-    assert _mode(display) == MODE_REST
+    assert _mode(display) == MODE_PENDING
     proposal_id = client.get("/api/session").get_json()["proposal"]["id"]
     rejected = client.post("/api/proposal/reject", json={"id": proposal_id})
     assert rejected.status_code == 200
@@ -82,7 +82,7 @@ def test_a_second_quest_is_refused_until_the_first_is_rejected(tmp_path: Path) -
     assert again.status_code == 200
     assert again.get_json()["proposal"]["title"] == "Sit and listen"
     assert again.get_json()["proposal"]["duration_minutes"] == 5
-    assert _mode(display) == MODE_REST
+    assert _mode(display) == MODE_PENDING
 
 
 def test_accept_starts_the_timer_and_a_reload_follows_it(tmp_path: Path) -> None:
@@ -322,4 +322,13 @@ class _BrokenDisplay:
         raise RuntimeError("bridge down")
 
     def set_grid_row(self, row: int, mask: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_view(self, view: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_plant(self, stage: int) -> None:
+        raise RuntimeError("bridge down")
+
+    def set_event(self, code: int, generation: int) -> None:
         raise RuntimeError("bridge down")

@@ -17,6 +17,7 @@ const sessionsNode = document.querySelector("#sessions");
 const historyRange = document.querySelector("#history-range");
 const plantLabel = document.querySelector("#plant-label");
 const plantDrawing = document.querySelector("#plant-drawing");
+const matrixNote = document.querySelector("#matrix-note");
 const categoryLabels = new Map(
   [...document.querySelectorAll("#category option")].map((option) => [option.value, option.textContent]),
 );
@@ -41,6 +42,13 @@ document.querySelector("#accept").addEventListener("click", accept);
 document.querySelector("#reject").addEventListener("click", reject);
 document.querySelector("#kept").addEventListener("click", () => report("kept"));
 document.querySelector("#not-kept").addEventListener("click", () => report("not_kept"));
+for (const input of document.querySelectorAll("input[name=matrix]")) {
+  input.addEventListener("change", () => {
+    if (input.checked) {
+      setMatrix(input.value);
+    }
+  });
+}
 
 boot();
 
@@ -142,6 +150,7 @@ function statusFor(phase) {
 
 function renderState(state) {
   showPlant(state.plant);
+  applyDisplay(state);
   if (state.phase === "proposed" && state.proposal) {
     showProposal(state.proposal);
     return;
@@ -227,6 +236,31 @@ function showModel(source) {
   }
   modelNote.hidden = true;
   modelNote.textContent = "";
+}
+
+function applyDisplay(state) {
+  if (!state || !state.display_mode) {
+    return;
+  }
+  for (const input of document.querySelectorAll("input[name=matrix]")) {
+    input.checked = input.value === state.display_mode;
+  }
+  matrixNote.textContent = state.display_connected
+    ? "Sent to the board. This page cannot see the glass."
+    : "Saved here. The board has not accepted it.";
+}
+
+async function setMatrix(mode) {
+  setBusy(true);
+  try {
+    const state = await sendJson("/api/display-mode", { display_mode: mode });
+    renderState(state);
+    statusNode.textContent = statusFor(state.phase);
+  } catch (error) {
+    statusNode.textContent = error.message;
+  } finally {
+    setBusy(false);
+  }
 }
 
 function showPlant(plant) {

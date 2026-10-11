@@ -14,6 +14,18 @@ from typing import Protocol
 
 from outmark.engine import SessionEngine
 from outmark.errors import DisplayError
+from outmark.frames import (
+    EVENT_ACCEPT,
+    EVENT_EXPIRED,
+    EVENT_KEPT,
+    EVENT_MODE,
+    EVENT_NOT_KEPT,
+    EVENT_PROPOSAL,
+    EVENT_STARTUP,
+    VIEW_CHART,
+    VIEW_PLANT,
+)
+from outmark.plant import plant_state
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +64,15 @@ class MatrixDisplay(Protocol):
     def set_grid_row(self, row: int, mask: int) -> None:
         """Set one history row. Bit 0 is the oldest day."""
 
+    def set_view(self, view: int) -> None:
+        """Select the chart or the plant. 0 is the chart and 1 is the plant."""
+
+    def set_plant(self, stage: int) -> None:
+        """Store the plant stage. This does not by itself play a growth animation."""
+
+    def set_event(self, code: int, generation: int) -> None:
+        """Play one animation. The same generation is ignored by the sketch."""
+
 
 @dataclass(frozen=True)
 class DisplayView:
@@ -75,6 +96,15 @@ class RecordingDisplay:
     def set_grid_row(self, row: int, mask: int) -> None:
         self.calls.append(("set_grid_row", row, mask))
 
+    def set_view(self, view: int) -> None:
+        self.calls.append(("set_view", view))
+
+    def set_plant(self, stage: int) -> None:
+        self.calls.append(("set_plant", stage))
+
+    def set_event(self, code: int, generation: int) -> None:
+        self.calls.append(("set_event", code, generation))
+
 
 class BridgeDisplay:
     """Call the sketch through arduino.app_utils.Bridge. Import happens on construction."""
@@ -93,6 +123,15 @@ class BridgeDisplay:
     def set_grid_row(self, row: int, mask: int) -> None:
         self._call("set_grid_row", row, mask)
 
+    def set_view(self, view: int) -> None:
+        self._call("set_view", view)
+
+    def set_plant(self, stage: int) -> None:
+        self._call("set_plant", stage)
+
+    def set_event(self, code: int, generation: int) -> None:
+        self._call("set_event", code, generation)
+
 
 def open_bridge_display() -> BridgeDisplay | None:
     """Return a board display, or None when the App Lab bridge is not installed."""
@@ -108,6 +147,8 @@ def describe(engine: SessionEngine) -> DisplayView:
     snapshot = engine.active_session()
     masks = tuple(engine.history().row_mask(row) for row in range(ROWS))
     if snapshot is None:
+        if engine.open_proposal() is not None:
+            return DisplayView(MODE_PENDING, 0, masks)
         mode = MODE_GRID if any(masks) else MODE_REST
         return DisplayView(mode, 0, masks)
     if snapshot.deadline_passed:
@@ -117,8 +158,24 @@ def describe(engine: SessionEngine) -> DisplayView:
     return DisplayView(MODE_ACTIVE, snapshot.progress_segments, masks)
 
 
-def publish(engine: SessionEngine, display: MatrixDisplay) -> None:
-    """Send the current view. A failure here must not be treated as a session change."""
+def publish(
+    engine: SessionEngine,
+    display: MatrixDisplay,
+    event: tuple[int, int] | None = None,
+) -> None:
+    """Send the current view. A failure here must not be treated as a session change.
+
+    A kept event is sent before the new plant stage so the sketch can animate
+    from the previous silhouette. Refresh calls omit the event.
+    """
+    stage = int(plant_state(engine.sessions())["stage"])
+    view = VIEW_PLANT if engine.display_mode() == "plant" else VIEW_CHART
+    if event is not None and event[0] == EVENT_KEPT:
+        display.set_event(event[0], event[1])
+    display.set_plant(stage)
+    if event is not None and event[0] != EVENT_KEPT:
+        display.set_event(event[0], event[1])
+    display.set_view(view)
     send(display, describe(engine))
 
 
@@ -163,18 +220,74 @@ def render_frame(mode: int, progress: int, masks: tuple[int, ...]) -> tuple[int,
     return tuple(frame)
 
 
+class DisplayTracker:
+    """Remember the last phase so a refresh does not replay an animation."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._generation = 0
+        self._seen = False
+        self._phase = "idle"
+        self._stage = 0
+        self._mode = "chart"
+
+    def observe(self, engine: SessionEngine) -> tuple[int, int] | None:
+        with self._lock:
+            return self._observe(engine)
+
+    def _observe(self, engine: SessionEngine) -> tuple[int, int] | None:
+        phase = _phase(engine)
+        stage = int(plant_state(engine.sessions())["stage"])
+        mode = engine.display_mode()
+        code: int | None = None
+        if not self._seen:
+            code = EVENT_STARTUP
+        elif mode != self._mode:
+            code = EVENT_MODE
+        elif phase == "proposed" and self._phase != "proposed":
+            code = EVENT_PROPOSAL
+        elif phase == "active" and self._phase == "proposed":
+            code = EVENT_ACCEPT
+        elif phase == "awaiting_report" and self._phase == "active":
+            code = EVENT_EXPIRED
+        elif self._phase == "awaiting_report" and phase == "idle":
+            code = EVENT_KEPT if stage > self._stage else EVENT_NOT_KEPT
+        self._seen = True
+        self._phase = phase
+        self._stage = stage
+        self._mode = mode
+        if code is None:
+            return None
+        self._generation += 1
+        return (code, self._generation)
+
+
+def _phase(engine: SessionEngine) -> str:
+    snapshot = engine.active_session()
+    if snapshot is not None:
+        return "awaiting_report" if snapshot.deadline_passed else "active"
+    if engine.open_proposal() is not None:
+        return "proposed"
+    return "idle"
+
+
 def start_refresh(
     engine: SessionEngine,
     display: MatrixDisplay,
+    tracker: DisplayTracker,
     interval: float = REFRESH_SECONDS,
 ) -> None:
-    """Refresh progress from the engine without blocking the web server."""
+    """Refresh progress from the engine without blocking the web server.
+
+    The tracker emits an event only when the phase or mode changes, so the
+    five-second refresh does not replay a growth animation.
+    """
 
     def _loop() -> None:
         while True:
             time.sleep(interval)
             try:
-                publish(engine, display)
+                publish(engine, display, tracker.observe(engine))
             except Exception:
                 logger.exception("Matrix update failed. Stored sessions were left unchanged.")
 

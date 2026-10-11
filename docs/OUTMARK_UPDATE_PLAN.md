@@ -80,3 +80,4 @@ Each stage is one commit, in order, after `ruff` and `pytest`. Nothing is pushed
 - Stage 3: history entries are grouped by day and show time, duration, category, outcome, and an optional reflection. An expired timer stays on the countdown instead of returning to the setup form.
 - Stage 4: plant stage is `min(5, kept sessions)`, returned on the session and history payloads. The page draws that stage. Reject, expiry, `not_kept`, an early report, and a duplicate report do not advance it. 63 tests passed.
 - Stage 5: `frames.py` and the sketch share plant rows and event lengths. The sketch advances with `millis()` and `matrix.draw`. Playback on the physical glass was not run.
+- Stage 6: `display_mode` is stored with older files defaulting to `chart`. A kept report sends event 5 before the new stage. Restart sends startup, not another growth event. An open proposal holds the pending pattern. 77 tests passed.

@@ -284,6 +284,20 @@ input:focus-visible {
   margin-top: 0;
 }
 
+.matrix-choice {
+  margin-top: 1rem;
+}
+
+.matrix-choice label {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.matrix-choice input {
+  accent-color: var(--rule);
+}
+
 #plant-drawing {
   display: block;
   width: min(11rem, 70vw);

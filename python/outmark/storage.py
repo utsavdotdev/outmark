@@ -14,7 +14,8 @@ from outmark.records import Proposal, Session
 
 STORE_FILENAME = "outmark.json"
 DOCUMENT_VERSION = 1
-_SETTING_KEYS = frozenset({"default_duration"})
+_SETTING_KEYS = frozenset({"default_duration", "display_mode"})
+_DISPLAY_MODES = frozenset({"chart", "plant"})
 _DOCUMENT_KEYS = frozenset({"version", "settings", "proposals", "sessions"})
 
 
@@ -23,11 +24,15 @@ class Document:
     default_duration: int
     proposals: tuple[Proposal, ...]
     sessions: tuple[Session, ...]
+    display_mode: str = "chart"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": DOCUMENT_VERSION,
-            "settings": {"default_duration": self.default_duration},
+            "settings": {
+                "default_duration": self.default_duration,
+                "display_mode": self.display_mode,
+            },
             "proposals": [proposal.to_dict() for proposal in self.proposals],
             "sessions": [session.to_dict() for session in self.sessions],
         }
@@ -74,11 +79,16 @@ def _document(raw: object) -> Document:
     if raw.get("version") != DOCUMENT_VERSION:
         raise StorageError("activity history version is not supported")
     settings = raw.get("settings")
-    if not isinstance(settings, dict) or set(settings) != _SETTING_KEYS:
+    if not isinstance(settings, dict) or not set(settings) <= _SETTING_KEYS:
+        raise StorageError("settings are missing or unexpected")
+    if "default_duration" not in settings:
         raise StorageError("settings are missing or unexpected")
     default_duration = settings.get("default_duration")
     if isinstance(default_duration, bool) or default_duration not in (5, 10, 15):
         raise StorageError("default_duration must be 5, 10, or 15")
+    display_mode = settings.get("display_mode", "chart")
+    if display_mode not in _DISPLAY_MODES:
+        raise StorageError("display_mode must be chart or plant")
     proposals = _list(raw.get("proposals"), "proposals", Proposal.from_dict)
     sessions = _list(raw.get("sessions"), "sessions", Session.from_dict)
     _unique([item.id for item in proposals], "proposal id")
@@ -93,6 +103,7 @@ def _document(raw: object) -> Document:
         default_duration=int(default_duration),
         proposals=tuple(proposals),
         sessions=tuple(sessions),
+        display_mode=str(display_mode),
     )
 
 

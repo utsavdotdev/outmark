@@ -23,7 +23,7 @@ def main() -> None:
     app = create_app(settings, display=display)
     engine = app.config["OUTMARK_ENGINE"]
     if display is not None and engine is not None:
-        start_refresh(engine, display)
+        start_refresh(engine, display, app.config["OUTMARK_DISPLAY_TRACKER"])
     app.run(host=settings.host, port=settings.port, debug=False)
 
 
